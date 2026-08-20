@@ -18,6 +18,7 @@ Esta app tiene dos vistas:
     lo administrativo, protegido con una clave (ver .streamlit/secrets.toml).
 """
 
+import os
 from datetime import date, datetime, timedelta
 
 import altair as alt
@@ -43,6 +44,21 @@ DIAS_NOMBRE = {
 }
 
 st.set_page_config(page_title="Agenda de citas", page_icon="📅", layout="wide")
+
+# En Streamlit Cloud las credenciales de Turso viven en Secrets (nunca se
+# suben a git); localmente vienen de turso_config.py. db.py ya sabe leer
+# TURSO_DATABASE_URL / TURSO_AUTH_TOKEN de las variables de entorno, asi que
+# aqui solo las copiamos desde Secrets antes de tocar la base de datos.
+if not os.environ.get("TURSO_DATABASE_URL"):
+    try:
+        turso_url = st.secrets.get("turso_database_url")
+        turso_token = st.secrets.get("turso_auth_token")
+        if turso_url and turso_token:
+            os.environ["TURSO_DATABASE_URL"] = turso_url
+            os.environ["TURSO_AUTH_TOKEN"] = turso_token
+    except Exception:
+        pass
+
 db.init_db()
 
 negocio = db.get_negocio()

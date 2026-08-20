@@ -11,6 +11,8 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
 
+import turso_adapter
+
 DB_PATH = "agenda_citas.db"
 
 TIPOS_NEGOCIO = ["Consultorio medico", "Consultorio dental", "Barberia", "Otro"]
@@ -20,9 +22,17 @@ ESTADOS_CITA = ["Agendada", "Completada", "Cancelada", "No asistio"]
 
 @contextmanager
 def get_conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
+    """Usa la base de datos permanente en Turso si hay credenciales
+    disponibles (turso_config.py o variables de entorno); si no, cae en el
+    archivo SQLite local - asi el resto de este archivo no le importa cual
+    de las dos esta usando."""
+    turso_url, turso_token = turso_adapter.credenciales_turso()
+    if turso_url and turso_token:
+        conn = turso_adapter.TursoConn(turso_url, turso_token)
+    else:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
     try:
         yield conn
         conn.commit()
