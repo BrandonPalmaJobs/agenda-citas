@@ -1,0 +1,8 @@
+.streamlit/secrets.toml
+recordatorios_config.py
+google_client_secret.json
+google_token.json
+agenda_citas.db
+__pycache__/
+*.pyc
+*.log
