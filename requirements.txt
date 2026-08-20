@@ -2,6 +2,7 @@ streamlit
 pandas
 altair>=5.5,<6
 requests
+tzdata
 google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib

@@ -20,6 +20,7 @@ Esta app tiene dos vistas:
 
 import os
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import altair as alt
 import pandas as pd
@@ -64,6 +65,20 @@ db.init_db()
 negocio = db.get_negocio()
 
 
+ZONA_HORARIA_NEGOCIO = ZoneInfo("America/Mexico_City")
+
+
+def ahora_negocio():
+    """Hora actual en la zona horaria del negocio (Mexico), no la del
+    servidor donde corra la app - Streamlit Cloud corre en otro huso
+    horario y usar datetime.now() a secas filtraba horarios mal."""
+    return datetime.now(ZONA_HORARIA_NEGOCIO)
+
+
+def hoy_negocio():
+    return ahora_negocio().date()
+
+
 def generar_horarios(apertura, cierre, intervalo_min):
     slots = []
     actual = datetime.strptime(apertura, "%H:%M")
@@ -76,9 +91,9 @@ def generar_horarios(apertura, cierre, intervalo_min):
 
 def quitar_horas_pasadas(horarios, fecha_sel):
     """Si la fecha elegida es hoy, quita los horarios que ya pasaron."""
-    if fecha_sel != date.today():
+    if fecha_sel != hoy_negocio():
         return horarios
-    ahora = datetime.now().strftime("%H:%M")
+    ahora = ahora_negocio().strftime("%H:%M")
     return [h for h in horarios if h > ahora]
 
 
@@ -138,7 +153,7 @@ def pagina_reservar_publica():
 
     dias_laborales = negocio["dias_laborales"].split(",")
     fecha_sel = st.date_input(
-        "Fecha", value=date.today(), min_value=date.today(), key="fecha_reserva_publica")
+        "Fecha", value=hoy_negocio(), min_value=hoy_negocio(), key="fecha_reserva_publica")
 
     if db.DIAS_SEMANA[fecha_sel.weekday()] not in dias_laborales:
         dias_abiertos = ", ".join(DIAS_NOMBRE.get(d, d) for d in dias_laborales)
@@ -306,7 +321,7 @@ if pagina == "Agenda del dia":
 
     col1, col2 = st.columns([1, 2])
     with col1:
-        fecha_sel = st.date_input("Fecha", value=date.today())
+        fecha_sel = st.date_input("Fecha", value=hoy_negocio())
     proveedores = db.list_proveedores(solo_activos=True)
     with col2:
         opciones_prov = {0: "Todos"} | {p["id"]: p["nombre"] for p in proveedores}
@@ -438,7 +453,7 @@ elif pagina == "Nueva cita":
                                          format_func=lambda pid: next(p["nombre"] for p in proveedores if p["id"] == pid))
             duracion = next(s["duracion_min"] for s in servicios if s["id"] == servicio_id)
 
-            fecha_cita = st.date_input("Fecha", value=date.today())
+            fecha_cita = st.date_input("Fecha", value=hoy_negocio())
             horarios_base = generar_horarios(negocio["hora_apertura"], negocio["hora_cierre"], negocio["intervalo_min"])
             horarios_base = quitar_horas_pasadas(horarios_base, fecha_cita)
             horarios = db.horarios_disponibles(proveedor_id, fecha_cita.isoformat(), duracion, horarios_base)
@@ -593,7 +608,7 @@ elif pagina == "Estadisticas":
     st.title("📊 Estadisticas del negocio")
     st.caption("Solo visible para el dueno. Cuenta cada cita una vez que ya tuvo un resultado final.")
 
-    hoy = date.today()
+    hoy = hoy_negocio()
     preset = st.selectbox(
         "Rango de fechas",
         ["Hoy", "Ultimos 7 dias", "Este mes", "Ultimos 30 dias", "Personalizado"],
