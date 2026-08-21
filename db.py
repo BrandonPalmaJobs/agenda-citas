@@ -20,6 +20,13 @@ DIAS_SEMANA = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"]
 ESTADOS_CITA = ["Agendada", "Completada", "Cancelada", "No asistio"]
 
 
+def usar_turso(url, token):
+    """Le dice a esta sesion (este hilo) que use esta base de datos de Turso
+    en particular - lo llama app.py al principio de cada peticion, para
+    cuando una sola app atiende varios negocios distintos."""
+    turso_adapter.establecer_credenciales(url, token)
+
+
 @contextmanager
 def get_conn():
     """Usa la base de datos permanente en Turso si hay credenciales

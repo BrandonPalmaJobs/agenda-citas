@@ -18,7 +18,6 @@ Esta app tiene dos vistas:
     lo administrativo, protegido con una clave (ver .streamlit/secrets.toml).
 """
 
-import os
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -46,19 +45,34 @@ DIAS_NOMBRE = {
 
 st.set_page_config(page_title="Agenda de citas", page_icon="📅", layout="wide")
 
-# En Streamlit Cloud las credenciales de Turso viven en Secrets (nunca se
-# suben a git); localmente vienen de turso_config.py. db.py ya sabe leer
-# TURSO_DATABASE_URL / TURSO_AUTH_TOKEN de las variables de entorno, asi que
-# aqui solo las copiamos desde Secrets antes de tocar la base de datos.
-if not os.environ.get("TURSO_DATABASE_URL"):
+# Una cuenta gratuita de Streamlit Cloud solo permite una app - para atender
+# varios negocios con esa misma app, cada uno se identifica con "?negocio=X"
+# en la URL, y sus credenciales viven en su propia tabla [negocios.X] dentro
+# de Secrets. Sin ese parametro, se usan los Secrets de nivel superior (caso
+# de una sola app para un solo negocio).
+NEGOCIO_SLUG = st.query_params.get("negocio", "")
+
+
+def _secreto(nombre):
     try:
-        turso_url = st.secrets.get("turso_database_url")
-        turso_token = st.secrets.get("turso_auth_token")
-        if turso_url and turso_token:
-            os.environ["TURSO_DATABASE_URL"] = turso_url
-            os.environ["TURSO_AUTH_TOKEN"] = turso_token
+        if NEGOCIO_SLUG:
+            return st.secrets.get("negocios", {}).get(NEGOCIO_SLUG, {}).get(nombre)
+        return st.secrets.get(nombre)
     except Exception:
-        pass
+        return None
+
+
+# En Streamlit Cloud las credenciales de Turso viven en Secrets (nunca se
+# suben a git); localmente vienen de turso_config.py. Se fijan por hilo (no
+# con os.environ, que es global al proceso) porque una sola app puede estar
+# atendiendo peticiones de varios negocios distintos a la vez.
+turso_url = _secreto("turso_database_url")
+turso_token = _secreto("turso_auth_token")
+if turso_url and turso_token:
+    db.usar_turso(turso_url, turso_token)
+elif NEGOCIO_SLUG:
+    st.error(f"No encontramos configuracion para el negocio '{NEGOCIO_SLUG}'. Revisa el link.")
+    st.stop()
 
 db.init_db()
 
@@ -265,13 +279,6 @@ if st.query_params.get("panel") != "staff":
     pagina_reservar_publica()
     st.stop()
 
-def _secreto(nombre):
-    try:
-        return st.secrets.get(nombre)
-    except Exception:
-        return None
-
-
 if "staff_autenticado" not in st.session_state:
     st.session_state.staff_autenticado = False
 if "rol" not in st.session_state:
@@ -302,12 +309,21 @@ if st.sidebar.button("Salir del panel"):
     st.session_state.rol = None
     st.rerun()
 with st.sidebar.expander("Link para que agenden los clientes"):
-    st.caption(
-        "Comparte la URL de esta app SIN el '?panel=staff' al final "
-        "(esa parte es solo para que tu entres aqui). Por ejemplo, si "
-        "esto vive en https://mi-negocio.streamlit.app/?panel=staff, "
-        "el link para clientes es https://mi-negocio.streamlit.app/"
-    )
+    if NEGOCIO_SLUG:
+        st.caption(
+            "Esta app atiende varios negocios - comparte la URL con "
+            f"'?negocio={NEGOCIO_SLUG}' pero SIN el '&panel=staff' "
+            "(esa parte es solo para que tu entres aqui). Ejemplo: si el "
+            f"panel vive en .../?negocio={NEGOCIO_SLUG}&panel=staff, el link "
+            f"para clientes es .../?negocio={NEGOCIO_SLUG}"
+        )
+    else:
+        st.caption(
+            "Comparte la URL de esta app SIN el '?panel=staff' al final "
+            "(esa parte es solo para que tu entres aqui). Por ejemplo, si "
+            "esto vive en https://mi-negocio.streamlit.app/?panel=staff, "
+            "el link para clientes es https://mi-negocio.streamlit.app/"
+        )
 
 paginas = ["Agenda del dia", "Nueva cita", "Clientes", "Servicios", "Personal", "Configuracion"]
 if st.session_state.rol == "dueno":

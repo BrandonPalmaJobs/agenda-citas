@@ -4,6 +4,7 @@ turso_config.py
 google_client_secret.json
 google_token.json
 agenda_citas.db
+respaldos/
 __pycache__/
 *.pyc
 *.log

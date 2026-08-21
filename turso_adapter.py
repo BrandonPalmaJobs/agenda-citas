@@ -9,21 +9,41 @@ variante "sincrona" tiene un bug intermitente (mezcla mal hilos con su loop
 async interno y a veces tira una respuesta a medias). Con requests puro,
 sin nada de async, ese problema no existe.
 
-Se activa solo si hay credenciales de Turso disponibles (variables de entorno
-TURSO_DATABASE_URL / TURSO_AUTH_TOKEN, o el archivo local turso_config.py).
-Si no hay credenciales, quien use esto debe seguir con sqlite3 normal - ver
-la funcion credenciales_turso().
+Se activa solo si hay credenciales de Turso disponibles: primero las que se
+hayan fijado para el hilo actual con establecer_credenciales() (una app que
+atiende varios negocios llama a esto por cada peticion - ver db.usar_turso),
+luego las variables de entorno TURSO_DATABASE_URL/TURSO_AUTH_TOKEN, y por
+ultimo el archivo local turso_config.py. Si no hay nada de eso, quien use
+esto debe seguir con sqlite3 normal - ver la funcion credenciales_turso().
 """
 
 import os
 import re
+import threading
 
 import requests
+
+_local = threading.local()
+
+
+def establecer_credenciales(url, token):
+    """Fija las credenciales de Turso para el hilo actual. Importante: NO
+    usar os.environ para esto en una app que atiende varios negocios en el
+    mismo proceso - os.environ es global a todo el proceso, asi que el
+    primer negocio que cargara se quedaria "pegado" para todas las
+    peticiones siguientes de CUALQUIER negocio. Cada sesion de Streamlit
+    corre en su propio hilo, asi que threading.local() si aisla bien."""
+    _local.turso_url = url
+    _local.turso_token = token
 
 
 def credenciales_turso():
     """Regresa (url, auth_token) si hay credenciales de Turso disponibles,
     o (None, None) si no - para que el que llama decida usar sqlite3 local."""
+    url = getattr(_local, "turso_url", None)
+    token = getattr(_local, "turso_token", None)
+    if url and token:
+        return url, token
     url = os.environ.get("TURSO_DATABASE_URL")
     token = os.environ.get("TURSO_AUTH_TOKEN")
     if url and token:
