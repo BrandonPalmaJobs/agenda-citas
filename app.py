@@ -19,6 +19,7 @@ Esta app tiene dos vistas:
 """
 
 import base64
+import io
 import re
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -45,8 +46,6 @@ DIAS_NOMBRE = {
     "Vie": "viernes", "Sab": "sabado", "Dom": "domingo",
 }
 
-st.set_page_config(page_title="Agenda de citas", page_icon="📅", layout="wide")
-
 # Una cuenta gratuita de Streamlit Cloud solo permite una app - para atender
 # varios negocios con esa misma app, cada uno se identifica con "?negocio=X"
 # en la URL, y sus credenciales viven en su propia tabla [negocios.X] dentro
@@ -70,15 +69,39 @@ def _secreto(nombre):
 # atendiendo peticiones de varios negocios distintos a la vez.
 turso_url = _secreto("turso_database_url")
 turso_token = _secreto("turso_auth_token")
-if turso_url and turso_token:
-    db.usar_turso(turso_url, turso_token)
-elif NEGOCIO_SLUG:
+
+# Siempre se fija (incluso a None, None) aunque no haya credenciales para
+# esta peticion: Streamlit puede reusar el mismo hilo del servidor para
+# atender a otro negocio despues, y si no se limpia aqui, ese hilo se
+# quedaria con las credenciales del negocio anterior "pegadas" - exactamente
+# el mismo problema de fuga entre negocios que threading.local() buscaba
+# evitar en primer lugar.
+db.usar_turso(turso_url, turso_token)
+
+_negocio_no_configurado = bool(NEGOCIO_SLUG and not (turso_url and turso_token))
+
+if _negocio_no_configurado:
+    negocio = None
+else:
+    db.init_db()
+    negocio = db.get_negocio()
+
+# El icono de la pestaña del navegador usa el logo del negocio (si ya subio
+# uno) en vez del emoji generico - por eso set_page_config, que debe ser el
+# primer comando de Streamlit, se llama hasta aqui, una vez que ya sabemos
+# si hay negocio y logo.
+_icono_pagina = "📅"
+if negocio and negocio.get("logo_base64"):
+    try:
+        _icono_pagina = io.BytesIO(base64.b64decode(negocio["logo_base64"]))
+    except Exception:
+        _icono_pagina = "📅"
+
+st.set_page_config(page_title="Agenda de citas", page_icon=_icono_pagina, layout="wide")
+
+if _negocio_no_configurado:
     st.error(f"No encontramos configuracion para el negocio '{NEGOCIO_SLUG}'. Revisa el link.")
     st.stop()
-
-db.init_db()
-
-negocio = db.get_negocio()
 
 
 ZONA_HORARIA_NEGOCIO = ZoneInfo("America/Mexico_City")
@@ -682,6 +705,13 @@ elif pagina == "Configuracion":
 
     st.divider()
 
+    # Fuera del formulario a proposito: los widgets dentro de un st.form no
+    # vuelven a correr el script hasta que se manda el formulario, asi que
+    # el checkbox no podia des-bloquear los campos de abajo en vivo.
+    tiene_descanso = st.checkbox(
+        "¿Cierran para comer o tienen un bloque no disponible a medio dia?",
+        value=bool(negocio.get("descanso_inicio")), key="config_tiene_descanso")
+
     with st.form("form_config"):
         nombre = st.text_input("Nombre del negocio", value=negocio["nombre"])
         tipo = st.selectbox("Tipo de negocio", options=db.TIPOS_NEGOCIO,
@@ -694,9 +724,6 @@ elif pagina == "Configuracion":
         dias_actuales = negocio["dias_laborales"].split(",")
         dias = st.multiselect("Dias laborales", options=db.DIAS_SEMANA, default=dias_actuales)
 
-        tiene_descanso = st.checkbox(
-            "¿Cierran para comer o tienen un bloque no disponible a medio dia?",
-            value=bool(negocio.get("descanso_inicio")))
         dc1, dc2 = st.columns(2)
         descanso_inicio = dc1.text_input(
             "Descanso desde (HH:MM)", value=negocio.get("descanso_inicio") or "14:00", disabled=not tiene_descanso)
