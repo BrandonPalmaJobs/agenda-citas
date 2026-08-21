@@ -161,6 +161,28 @@ def hora_valida(s):
     return 0 <= int(h) <= 23 and 0 <= int(m) <= 59
 
 
+def telefono_valido(s):
+    """Numero de celular mexicano: exactamente 10 digitos, sin espacios ni guiones."""
+    return bool(re.fullmatch(r"\d{10}", (s or "").strip()))
+
+
+def enmascarar_nombre(nombre):
+    """'Brandon Palma' -> 'B*****n P***a': solo la inicial y la ultima letra de
+    cada palabra (nombre y apellido) quedan visibles, para no exponer el
+    nombre completo de un cliente ya registrado a quien apenas lo busca.
+    Los asteriscos van escapados con "\\*" porque esto se muestra con
+    st.success/st.markdown, que interpreta Markdown - sin escapar, varios
+    asteriscos seguidos se leen como enfasis (negritas/cursivas) y desaparecen
+    en vez de mostrarse tal cual."""
+    palabras = []
+    for palabra in (nombre or "").strip().split():
+        if len(palabra) <= 2:
+            palabras.append(palabra)
+        else:
+            palabras.append(palabra[0] + "\\*" * (len(palabra) - 2) + palabra[-1])
+    return " ".join(palabras)
+
+
 def mostrar_logo(negocio, ancho=140):
     if negocio.get("logo_base64"):
         try:
@@ -327,9 +349,9 @@ def pagina_reservar_publica():
                            "o usa 'Cliente nuevo' para registrarte.")
             elif len(encontrados) == 1:
                 cliente_sel = encontrados[0]
-                st.success(f"Hola de nuevo, {cliente_sel['nombre']}.")
+                st.success(f"Hola de nuevo, {enmascarar_nombre(cliente_sel['nombre'])}.")
             else:
-                opciones = {c["id"]: f"{c['nombre']} - {c['telefono'] or c['email'] or 'sin datos'}"
+                opciones = {c["id"]: f"{enmascarar_nombre(c['nombre'])} - {c['telefono'] or c['email'] or 'sin datos'}"
                             for c in encontrados}
                 cid = st.selectbox("Encontramos varios - ¿cual eres?", options=list(opciones.keys()),
                                     format_func=lambda cid: opciones[cid])
@@ -349,6 +371,8 @@ def pagina_reservar_publica():
             if st.form_submit_button("Confirmar cita"):
                 if not nombre.strip() or not telefono.strip():
                     st.error("Nombre y telefono son obligatorios.")
+                elif not telefono_valido(telefono):
+                    st.error("El telefono debe tener 10 digitos (solo numeros, sin espacios ni guiones).")
                 else:
                     cliente_existente = db.find_cliente_por_telefono(telefono.strip())
                     if cliente_existente:
@@ -539,6 +563,8 @@ elif pagina == "Nueva cita":
                 if st.form_submit_button("Guardar cliente"):
                     if not nombre_nuevo.strip():
                         st.error("Ponle un nombre al cliente.")
+                    elif telefono_nuevo.strip() and not telefono_valido(telefono_nuevo):
+                        st.error("El telefono debe tener 10 digitos (solo numeros, sin espacios ni guiones).")
                     else:
                         db.add_cliente(nombre_nuevo.strip(), telefono_nuevo.strip(), email_nuevo.strip(), "")
                         st.success(f"Cliente '{nombre_nuevo}' agregado. Ya deberia aparecer en la lista de abajo.")
@@ -603,6 +629,8 @@ elif pagina == "Clientes":
             if st.form_submit_button("Guardar"):
                 if not nombre.strip():
                     st.error("Ponle un nombre al cliente.")
+                elif telefono.strip() and not telefono_valido(telefono):
+                    st.error("El telefono debe tener 10 digitos (solo numeros, sin espacios ni guiones).")
                 else:
                     db.add_cliente(nombre.strip(), telefono.strip(), email.strip(), notas.strip())
                     st.success("Cliente agregado.")
@@ -620,9 +648,12 @@ elif pagina == "Clientes":
                 email_e = st.text_input("Email", value=cl["email"] or "", key=f"mail_{cl['id']}")
                 notas_e = st.text_area("Notas", value=cl["notas"] or "", key=f"notas_{cl['id']}")
                 if st.form_submit_button("Guardar cambios"):
-                    db.update_cliente(cl["id"], nombre_e.strip(), telefono_e.strip(), email_e.strip(), notas_e.strip())
-                    st.success("Actualizado.")
-                    st.rerun()
+                    if telefono_e.strip() and not telefono_valido(telefono_e):
+                        st.error("El telefono debe tener 10 digitos (solo numeros, sin espacios ni guiones).")
+                    else:
+                        db.update_cliente(cl["id"], nombre_e.strip(), telefono_e.strip(), email_e.strip(), notas_e.strip())
+                        st.success("Actualizado.")
+                        st.rerun()
 
 # ---------------------------------------------------------------- Servicios
 elif pagina == "Servicios":
@@ -658,7 +689,7 @@ elif pagina == "Servicios":
 
 # ---------------------------------------------------------------- Personal
 elif pagina == "Personal":
-    st.title("🧑‍⚕️ Personal")
+    st.title("💈 Personal")
     st.caption("Doctores, dentistas, barberos - quien atiende las citas.")
 
     with st.expander("Agregar persona nueva"):
