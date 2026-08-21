@@ -18,6 +18,8 @@ Esta app tiene dos vistas:
     lo administrativo, protegido con una clave (ver .streamlit/secrets.toml).
 """
 
+import base64
+import re
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -111,6 +113,62 @@ def quitar_horas_pasadas(horarios, fecha_sel):
     return [h for h in horarios if h > ahora]
 
 
+def quitar_horas_descanso(horarios, duracion_min, descanso_inicio, descanso_fin):
+    """Quita los horarios cuya cita se encimaria con el bloque de descanso
+    (hora de comida, etc.) del negocio - si no hay descanso configurado no
+    quita nada."""
+    if not descanso_inicio or not descanso_fin:
+        return horarios
+    d_ini = datetime.strptime(descanso_inicio, "%H:%M")
+    d_fin = datetime.strptime(descanso_fin, "%H:%M")
+    resultado = []
+    for h in horarios:
+        h_ini = datetime.strptime(h, "%H:%M")
+        h_fin = h_ini + timedelta(minutes=duracion_min)
+        if h_ini < d_fin and h_fin > d_ini:
+            continue
+        resultado.append(h)
+    return resultado
+
+
+def hora_valida(s):
+    if not re.match(r"^\d{2}:\d{2}$", s or ""):
+        return False
+    h, m = s.split(":")
+    return 0 <= int(h) <= 23 and 0 <= int(m) <= 59
+
+
+def mostrar_logo(negocio, ancho=140):
+    if negocio.get("logo_base64"):
+        try:
+            st.image(base64.b64decode(negocio["logo_base64"]), width=ancho)
+        except Exception:
+            pass
+
+
+def selector_horarios(horarios, key_prefix):
+    """Cuadritos de horas para elegir, en vez de un dropdown - solo muestra
+    las horas que de verdad estan disponibles. Regresa la hora elegida."""
+    key_sel = f"{key_prefix}_hora_sel"
+    if st.session_state.get(key_sel) not in horarios:
+        st.session_state[key_sel] = horarios[0] if horarios else None
+
+    por_fila = 6
+    for i in range(0, len(horarios), por_fila):
+        fila = horarios[i:i + por_fila]
+        cols = st.columns(por_fila)
+        for j, h in enumerate(fila):
+            es_actual = st.session_state[key_sel] == h
+            if cols[j].button(
+                h, key=f"{key_prefix}_btn_{h}",
+                type="primary" if es_actual else "secondary",
+                use_container_width=True,
+            ):
+                st.session_state[key_sel] = h
+                st.rerun()
+    return st.session_state[key_sel]
+
+
 def etiqueta_estado(estado):
     return {"Agendada": "🟦", "Completada": "✅", "Cancelada": "❌", "No asistio": "⚠️"}.get(estado, "")
 
@@ -146,6 +204,7 @@ def _avisar_calendar(cita_id, cliente, servicio_nombre, proveedor_nombre, fecha_
 
 # ---------------------------------------------------------------- Vista publica: cliente se autoagenda
 def pagina_reservar_publica():
+    mostrar_logo(negocio)
     st.title(f"📅 Reservar cita - {negocio['nombre']}")
     st.caption(negocio["tipo"])
 
@@ -189,6 +248,8 @@ def pagina_reservar_publica():
 
     horarios_base = generar_horarios(negocio["hora_apertura"], negocio["hora_cierre"], negocio["intervalo_min"])
     horarios_base = quitar_horas_pasadas(horarios_base, fecha_sel)
+    horarios_base = quitar_horas_descanso(
+        horarios_base, duracion, negocio.get("descanso_inicio"), negocio.get("descanso_fin"))
 
     if proveedor_sel == 0:
         disponibles = sorted(set().union(*[
@@ -201,7 +262,8 @@ def pagina_reservar_publica():
         st.warning("No hay horarios disponibles ese dia para esa opcion. Prueba otra fecha, servicio o proveedor.")
         return
 
-    hora_sel = st.selectbox("Hora disponible", options=disponibles)
+    st.write("Hora disponible")
+    hora_sel = selector_horarios(disponibles, key_prefix="pub")
 
     servicio_nombre = next(s["nombre"] for s in servicios if s["id"] == servicio_id)
 
@@ -258,12 +320,12 @@ def pagina_reservar_publica():
             c1, c2 = st.columns(2)
             nombre = c1.text_input("Nombre completo")
             telefono = c2.text_input("Telefono")
-            email = st.text_input("Email (obligatorio - ahi te mandamos la invitacion y el recordatorio)")
+            email = st.text_input("Email (opcional - si lo dejas, te mandamos invitacion y recordatorio)")
             notas = st.text_area("Algo que debamos saber (opcional)")
 
             if st.form_submit_button("Confirmar cita"):
-                if not nombre.strip() or not telefono.strip() or not email.strip():
-                    st.error("Nombre, telefono y correo son obligatorios.")
+                if not nombre.strip() or not telefono.strip():
+                    st.error("Nombre y telefono son obligatorios.")
                 else:
                     cliente_existente = db.find_cliente_por_telefono(telefono.strip())
                     if cliente_existente:
@@ -302,6 +364,9 @@ if not st.session_state.staff_autenticado:
             st.error("Clave incorrecta (revisa .streamlit/secrets.toml).")
     st.stop()
 
+if negocio.get("logo_base64"):
+    with st.sidebar:
+        mostrar_logo(negocio, ancho=100)
 st.sidebar.title(negocio["nombre"])
 st.sidebar.caption(negocio["tipo"])
 if st.sidebar.button("Salir del panel"):
@@ -447,12 +512,10 @@ elif pagina == "Nueva cita":
                 nc1, nc2 = st.columns(2)
                 nombre_nuevo = nc1.text_input("Nombre del cliente")
                 telefono_nuevo = nc2.text_input("Telefono")
-                email_nuevo = st.text_input("Correo (obligatorio - para la invitacion de Google Calendar)")
+                email_nuevo = st.text_input("Correo (opcional - si lo pones, se le manda invitacion de Calendar)")
                 if st.form_submit_button("Guardar cliente"):
                     if not nombre_nuevo.strip():
                         st.error("Ponle un nombre al cliente.")
-                    elif not email_nuevo.strip():
-                        st.error("El correo es obligatorio para poder mandarle la invitacion/recordatorio.")
                     else:
                         db.add_cliente(nombre_nuevo.strip(), telefono_nuevo.strip(), email_nuevo.strip(), "")
                         st.success(f"Cliente '{nombre_nuevo}' agregado. Ya deberia aparecer en la lista de abajo.")
@@ -472,15 +535,19 @@ elif pagina == "Nueva cita":
             fecha_cita = st.date_input("Fecha", value=hoy_negocio())
             horarios_base = generar_horarios(negocio["hora_apertura"], negocio["hora_cierre"], negocio["intervalo_min"])
             horarios_base = quitar_horas_pasadas(horarios_base, fecha_cita)
+            horarios_base = quitar_horas_descanso(
+                horarios_base, duracion, negocio.get("descanso_inicio"), negocio.get("descanso_fin"))
             horarios = db.horarios_disponibles(proveedor_id, fecha_cita.isoformat(), duracion, horarios_base)
 
             if not horarios:
                 st.warning("No hay horarios disponibles para ese proveedor en esa fecha.")
             else:
+                st.write("Hora disponible")
+                hora_cita = selector_horarios(horarios, key_prefix="staff_nueva")
+
                 with st.form("form_nueva_cita"):
                     cliente_id = st.selectbox("Cliente", options=[c["id"] for c in clientes],
                                                format_func=lambda cid: next(c["nombre"] for c in clientes if c["id"] == cid))
-                    hora_cita = st.selectbox("Hora disponible", options=horarios)
                     notas = st.text_area("Notas (opcional)")
 
                     if st.form_submit_button("Agendar cita"):
@@ -508,13 +575,11 @@ elif pagina == "Clientes":
             c1, c2 = st.columns(2)
             nombre = c1.text_input("Nombre")
             telefono = c2.text_input("Telefono")
-            email = st.text_input("Correo (obligatorio - para la invitacion de Google Calendar)")
+            email = st.text_input("Correo (opcional - si lo pones, se le manda invitacion de Calendar)")
             notas = st.text_area("Notas (opcional)")
             if st.form_submit_button("Guardar"):
                 if not nombre.strip():
                     st.error("Ponle un nombre al cliente.")
-                elif not email.strip():
-                    st.error("El correo es obligatorio para poder mandarle la invitacion/recordatorio.")
                 else:
                     db.add_cliente(nombre.strip(), telefono.strip(), email.strip(), notas.strip())
                     st.success("Cliente agregado.")
@@ -602,6 +667,21 @@ elif pagina == "Personal":
 elif pagina == "Configuracion":
     st.title("⚙️ Configuracion del negocio")
 
+    st.subheader("Logo")
+    mostrar_logo(negocio, ancho=160)
+    logo_subido = st.file_uploader("Subir/cambiar logo (PNG o JPG)", type=["png", "jpg", "jpeg"])
+    lc1, lc2 = st.columns(2)
+    if logo_subido is not None and lc1.button("Guardar este logo"):
+        db.set_logo(base64.b64encode(logo_subido.read()).decode("ascii"))
+        st.success("Logo actualizado.")
+        st.rerun()
+    if negocio.get("logo_base64") and lc2.button("Quitar logo"):
+        db.set_logo(None)
+        st.success("Logo quitado.")
+        st.rerun()
+
+    st.divider()
+
     with st.form("form_config"):
         nombre = st.text_input("Nombre del negocio", value=negocio["nombre"])
         tipo = st.selectbox("Tipo de negocio", options=db.TIPOS_NEGOCIO,
@@ -614,10 +694,34 @@ elif pagina == "Configuracion":
         dias_actuales = negocio["dias_laborales"].split(",")
         dias = st.multiselect("Dias laborales", options=db.DIAS_SEMANA, default=dias_actuales)
 
+        tiene_descanso = st.checkbox(
+            "¿Cierran para comer o tienen un bloque no disponible a medio dia?",
+            value=bool(negocio.get("descanso_inicio")))
+        dc1, dc2 = st.columns(2)
+        descanso_inicio = dc1.text_input(
+            "Descanso desde (HH:MM)", value=negocio.get("descanso_inicio") or "14:00", disabled=not tiene_descanso)
+        descanso_fin = dc2.text_input(
+            "Descanso hasta (HH:MM)", value=negocio.get("descanso_fin") or "15:00", disabled=not tiene_descanso)
+
         if st.form_submit_button("Guardar configuracion"):
-            db.set_negocio(nombre.strip(), tipo, hora_apertura.strip(), hora_cierre.strip(), dias, int(intervalo))
-            st.success("Configuracion guardada.")
-            st.rerun()
+            hora_apertura, hora_cierre = hora_apertura.strip(), hora_cierre.strip()
+            descanso_inicio, descanso_fin = (descanso_inicio.strip(), descanso_fin.strip()) if tiene_descanso else ("", "")
+
+            if not hora_valida(hora_apertura) or not hora_valida(hora_cierre):
+                st.error("La hora de apertura y de cierre deben tener el formato HH:MM (ej. 09:00).")
+            elif hora_apertura >= hora_cierre:
+                st.error("La hora de apertura debe ser antes que la hora de cierre.")
+            elif tiene_descanso and (not hora_valida(descanso_inicio) or not hora_valida(descanso_fin)):
+                st.error("El descanso debe tener horas con formato HH:MM (ej. 14:00).")
+            elif tiene_descanso and not (hora_apertura <= descanso_inicio < descanso_fin <= hora_cierre):
+                st.error("El descanso debe caer dentro del horario del negocio, con la hora 'desde' antes que 'hasta'.")
+            elif not dias:
+                st.error("Elige al menos un dia laboral.")
+            else:
+                db.set_negocio(nombre.strip(), tipo, hora_apertura, hora_cierre, dias, int(intervalo),
+                                descanso_inicio, descanso_fin)
+                st.success("Configuracion guardada.")
+                st.rerun()
 
 # ---------------------------------------------------------------- Estadisticas (solo dueno)
 elif pagina == "Estadisticas":

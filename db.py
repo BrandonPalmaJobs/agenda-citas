@@ -108,6 +108,13 @@ def init_db():
             )
         if "evento_calendar_id" not in columnas_citas:
             conn.execute("ALTER TABLE citas ADD COLUMN evento_calendar_id TEXT")
+        columnas_negocio = {row["name"] for row in conn.execute("PRAGMA table_info(negocio)")}
+        if "descanso_inicio" not in columnas_negocio:
+            conn.execute("ALTER TABLE negocio ADD COLUMN descanso_inicio TEXT")
+        if "descanso_fin" not in columnas_negocio:
+            conn.execute("ALTER TABLE negocio ADD COLUMN descanso_fin TEXT")
+        if "logo_base64" not in columnas_negocio:
+            conn.execute("ALTER TABLE negocio ADD COLUMN logo_base64 TEXT")
 
 
 # ---------- Negocio ----------
@@ -117,13 +124,20 @@ def get_negocio():
         return dict(conn.execute("SELECT * FROM negocio WHERE id = 1").fetchone())
 
 
-def set_negocio(nombre, tipo, hora_apertura, hora_cierre, dias_laborales, intervalo_min):
+def set_negocio(nombre, tipo, hora_apertura, hora_cierre, dias_laborales, intervalo_min,
+                 descanso_inicio="", descanso_fin=""):
     with get_conn() as conn:
         conn.execute(
             """UPDATE negocio SET nombre=?, tipo=?, hora_apertura=?, hora_cierre=?,
-               dias_laborales=?, intervalo_min=? WHERE id=1""",
-            (nombre, tipo, hora_apertura, hora_cierre, ",".join(dias_laborales), intervalo_min),
+               dias_laborales=?, intervalo_min=?, descanso_inicio=?, descanso_fin=? WHERE id=1""",
+            (nombre, tipo, hora_apertura, hora_cierre, ",".join(dias_laborales), intervalo_min,
+             descanso_inicio or None, descanso_fin or None),
         )
+
+
+def set_logo(logo_base64):
+    with get_conn() as conn:
+        conn.execute("UPDATE negocio SET logo_base64=? WHERE id=1", (logo_base64,))
 
 
 # ---------- Servicios ----------
