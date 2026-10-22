@@ -35,6 +35,7 @@ import turso_adapter
 import db
 import google_calendar
 import suscripcion
+import registro
 import ui
 import admin
 
@@ -57,13 +58,13 @@ def _recargar_si_cambio(*modulos):
 
 
 # turso_adapter primero: db y los demas dependen de el
-for _m in (turso_adapter, db, google_calendar, suscripcion, ui, admin):
+for _m in (turso_adapter, db, google_calendar, suscripcion, registro, ui, admin):
     if not hasattr(_m, "_fecha_cargado"):
         # primera vez en este proceso tras una actualizacion: recargar por si
         # el proceso traia una version vieja en memoria
         importlib.reload(_m)
         _m._fecha_cargado = os.path.getmtime(_m.__file__)
-_recargar_si_cambio(turso_adapter, db, google_calendar, suscripcion, ui, admin)
+_recargar_si_cambio(turso_adapter, db, google_calendar, suscripcion, registro, ui, admin)
 
 # Paleta de las graficas de Estadisticas: azul fuerte / gris claro / blanco.
 # Cancelada y No asistio quedan en tonos muy claros a proposito (pedido del

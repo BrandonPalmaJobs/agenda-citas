@@ -10,3 +10,4 @@ __pycache__/
 *.log
 aika_config.py
 clientes/
+registro_local.db

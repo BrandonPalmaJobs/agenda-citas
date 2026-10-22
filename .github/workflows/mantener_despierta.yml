@@ -32,9 +32,13 @@ jobs:
           python-version: "3.12"
       - name: Instalar navegador
         run: |
-          pip install -q playwright
+          pip install -q playwright requests
           python -m playwright install --with-deps chromium > /dev/null
       - name: Visitar la app
+        env:
+          # Opcional: acceso a la lista central de clinicas (ver configurar_registro.py)
+          REGISTRO_TURSO_URL: ${{ secrets.REGISTRO_TURSO_URL }}
+          REGISTRO_TURSO_TOKEN: ${{ secrets.REGISTRO_TURSO_TOKEN }}
         run: |
           python - <<'PY'
           import os, re
@@ -43,6 +47,22 @@ jobs:
               navegador = p.chromium.launch()
               urls = [l.strip() for l in open("despertar_urls.txt", encoding="utf-8")
                       if l.strip() and not l.strip().startswith("#")]
+              # + las apps de la lista central de clinicas (si hay acceso)
+              reg_url, reg_token = os.environ.get("REGISTRO_TURSO_URL"), os.environ.get("REGISTRO_TURSO_TOKEN")
+              if reg_url and reg_token:
+                  import requests
+                  try:
+                      r = requests.post(reg_url.replace("libsql://", "https://", 1).rstrip("/") + "/v1/execute",
+                                        headers={"Authorization": f"Bearer {reg_token}"},
+                                        json={"stmt": {"sql": "SELECT url_app FROM clinicas WHERE activa = 1 AND url_app != ''"}},
+                                        timeout=30).json()
+                      for fila in r["result"]["rows"]:
+                          u = fila[0].get("value")
+                          if u and u not in urls:
+                              urls.append(u)
+                  except Exception as e:
+                      print("No se pudo leer la lista central:", e)
+              print("Apps a visitar:", len(urls))
               for url in urls:
                   pagina = navegador.new_page()
                   try:

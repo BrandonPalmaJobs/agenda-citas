@@ -30,6 +30,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 import requests
 
 import db
+import registro
 import suscripcion
 
 # App de la demo: ahi vive tu panel de administrador (?panel=admin) y ahi se
@@ -221,11 +222,21 @@ def main():
         f'url_app = "{url_app_clinica}"\n'
     )
 
-    os.makedirs(".streamlit", exist_ok=True)
-    with open(ruta_secrets, "a", encoding="utf-8") as f:
-        if texto_secrets and not texto_secrets.endswith("\n"):
-            f.write("\n")
-        f.write(bloque_registro)
+    # Lista central: si esta configurada, la clinica se anota sola (sin pegar
+    # nada en los Secrets de la demo ni tocar despertar_urls.txt)
+    en_lista_central = False
+    if registro.configurado():
+        try:
+            registro.guardar(slug, nombre, tipo, url_app_clinica, url, token)
+            en_lista_central = True
+        except Exception as e:
+            print(f"  No se pudo anotar en la lista central ({e}); usa los pasos manuales de abajo.")
+    if not en_lista_central:
+        os.makedirs(".streamlit", exist_ok=True)
+        with open(ruta_secrets, "a", encoding="utf-8") as f:
+            if texto_secrets and not texto_secrets.endswith("\n"):
+                f.write("\n")
+            f.write(bloque_registro)
 
     ficha = (
         f"{nombre} ({tipo})\n"
@@ -242,7 +253,21 @@ def main():
         f.write(ficha + "\n--- Secrets de su app ---\n" + bloque_app)
 
     linea = "=" * 62
-    print(f"\n{linea}\n  SU BASE YA QUEDO LISTA. Faltan 3 pasos (unos 5 minutos):\n{linea}")
+    faltan = "1 paso" if en_lista_central else "3 pasos"
+    pasos_manuales = ("YA QUEDO EN TU LISTA CENTRAL: aparece sola en tu panel de administrador\n"
+                      "y el despertador la visitara solo. No hay que pegar nada mas.\n"
+                      if en_lista_central else f"""PASO 2 - Registrarla en TU panel de administrador
+  En la app de la demo ({URL_APP}) -> Manage app -> Settings -> Secrets,
+  pega esto AL FINAL y guarda:
+{linea}{bloque_registro}{linea}
+  (Esto ya quedo agregado tambien en .streamlit/secrets.toml de esta carpeta.)
+
+PASO 3 - Que nunca se duerma
+  En GitHub abre el archivo despertar_urls.txt del repositorio, dale al lapiz
+  (editar), agrega esta linea y guarda ("Commit changes"):
+      {url_app_clinica}
+""")
+    print(f"\n{linea}\n  SU BASE YA QUEDO LISTA. Falta(n) {faltan} (unos 5 minutos):\n{linea}")
     print(f"""
 PASO 1 - Crear SU app en Streamlit
   a) Entra a https://share.streamlit.io y dale "Create app"
@@ -254,17 +279,7 @@ PASO 1 - Crear SU app en Streamlit
 {bloque_app}{linea}
   e) Dale "Deploy" y espera 1-2 minutos.
 
-PASO 2 - Registrarla en TU panel de administrador
-  En la app de la demo ({URL_APP}) -> Manage app -> Settings -> Secrets,
-  pega esto AL FINAL y guarda:
-{linea}{bloque_registro}{linea}
-  (Esto ya quedo agregado tambien en .streamlit/secrets.toml de esta carpeta.)
-
-PASO 3 - Que nunca se duerma
-  En GitHub abre el archivo despertar_urls.txt del repositorio, dale al lapiz
-  (editar), agrega esta linea y guarda ("Commit changes"):
-      {url_app_clinica}
-""")
+{pasos_manuales}""")
     print(linea)
     print(ficha)
     print(f"(Ficha y Secrets guardados en {ruta_ficha} - esa carpeta no se sube a GitHub)")

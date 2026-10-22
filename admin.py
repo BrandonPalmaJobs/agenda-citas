@@ -14,6 +14,7 @@ from datetime import date, timedelta
 import streamlit as st
 
 import db
+import registro
 import suscripcion
 import ui
 
@@ -36,6 +37,48 @@ def _negocios_en_secrets():
         return {slug: dict(datos) for slug, datos in st.secrets.get("negocios", {}).items()}
     except Exception:
         return {}
+
+
+def _todas_las_clinicas():
+    """Clinicas del registro central + las de Secrets ([negocios.X]).
+    Regresa (dict slug -> datos, error_del_registro_o_None)."""
+    clinicas = {slug: {**d, "origen": "secrets"} for slug, d in _negocios_en_secrets().items()}
+    error = None
+    if registro.configurado():
+        try:
+            for c in registro.listar():
+                clinicas[c["slug"]] = {**c, "origen": "registro"}
+        except Exception as e:
+            error = str(e)[:200]
+    return clinicas, error
+
+
+def _seccion_registro():
+    if not registro.configurado():
+        with st.expander("🗂️ Lista central de clínicas: sin configurar"):
+            st.markdown(
+                "Con la lista central, las clínicas nuevas aparecen aquí **solas** (sin pegar nada en "
+                "Secrets) y puedes registrarlas o quitarlas desde este panel.\n\n"
+                "Para activarla, en tu PC haz doble clic en **`configurar_registro.bat`** y sigue los pasos.")
+        return
+    with st.expander("🗂️ Registrar una clínica que ya existe"):
+        st.caption("Para clínicas creadas a mano o antes de la lista central. No cambia nada en su app.")
+        with st.form("form_registrar_clinica"):
+            r1, r2 = st.columns(2)
+            slug = r1.text_input("Identificador corto (sin espacios)")
+            nombre = r2.text_input("Nombre")
+            url_app = st.text_input("Dirección de su app", placeholder="https://nombre.streamlit.app/")
+            t1, t2 = st.columns(2)
+            turso_url = t1.text_input("URL de su base (libsql://...)")
+            turso_token = t2.text_input("Token de su base", type="password")
+            if st.form_submit_button("Registrar", type="primary", use_container_width=True):
+                if not (slug.strip() and nombre.strip() and turso_url.strip() and turso_token.strip()):
+                    st.error("Faltan datos: identificador, nombre, URL y token son obligatorios.")
+                else:
+                    registro.guardar(slug.strip().lower(), nombre.strip(), "", url_app.strip(),
+                                     turso_url.strip(), turso_token.strip())
+                    st.success("Registrada.")
+                    st.rerun()
 
 
 def _leer_negocio(datos, desde, hasta):
@@ -84,9 +127,12 @@ def pagina(hoy, url_base):
             st.session_state.admin_ok = False
             st.rerun()
 
-    negocios = _negocios_en_secrets()
+    negocios, error_registro = _todas_las_clinicas()
+    if error_registro:
+        st.error(f"No se pudo leer la lista central de clínicas: {error_registro}")
     if not negocios:
-        st.info("Todavía no hay clínicas en Secrets ([negocios.X]).")
+        st.info("Todavía no hay clínicas registradas.")
+        _seccion_registro()
         return
 
     desde = hoy.replace(day=1).isoformat()
@@ -117,14 +163,18 @@ def pagina(hoy, url_base):
                    + ", ".join(f[2]["nombre"] for f in bloqueadas))
 
     with st.expander("➕ Dar de alta una clínica nueva"):
+        pasos_extra = ("3. Listo: aparece aquí sola (lista central) y el despertador la visita sola."
+                       if registro.configurado() else
+                       "3. Pega su bloque `[negocios.…]` al final de los Secrets de **esta** app para verla aquí.\n"
+                       "4. Agrega su dirección a `despertar_urls.txt` en GitHub para que nunca se duerma.")
         st.markdown(
             "1. En tu PC, en la carpeta `agenda_citas`, haz doble clic en **`nuevo_cliente.bat`** y "
             "contesta lo que te pregunta (nombre, giro, color, logo, dirección de su app).\n"
             "2. El script te guía para crear **su propia app** en Streamlit (mismo código) y pegar sus Secrets.\n"
-            "3. Pega su bloque `[negocios.…]` al final de los Secrets de **esta** app para verla aquí.\n"
-            "4. Agrega su dirección a `despertar_urls.txt` en GitHub para que nunca se duerma.\n\n"
-            "Queda con **14 días de prueba**; el script te da sus links y contraseñas."
+            + pasos_extra +
+            "\n\nQueda con **14 días de prueba**; el script te da sus links y contraseñas."
         )
+    _seccion_registro()
 
     orden = {"suspendida": 0, "prueba": 1, "activa": 2, "demo": 3, "": 4}
     filas.sort(key=lambda f: (f[2] is not None, orden.get((f[4] or {}).get("plan", ""), 5),
@@ -135,8 +185,17 @@ def pagina(hoy, url_base):
             if error:
                 st.markdown(f"**{slug}** · ⚠️ No se pudo leer su base de datos")
                 st.caption(error)
+                _boton_quitar(slug, datos)
                 continue
             _tarjeta_clinica(slug, datos, negocio, resumen, est, hoy, url_base)
+
+
+def _boton_quitar(slug, datos):
+    if datos.get("origen") == "registro":
+        if st.button("Quitar de la lista", key=f"quitar_{slug}",
+                     help="Solo la quita de esta lista. No borra sus datos ni apaga su app."):
+            registro.quitar(slug)
+            st.rerun()
 
 
 def _tarjeta_clinica(slug, datos, negocio, resumen, est, hoy, url_base):
@@ -209,3 +268,4 @@ def _tarjeta_clinica(slug, datos, negocio, resumen, est, hoy, url_base):
                     st.rerun()
         finally:
             db.usar_turso(None, None)
+        _boton_quitar(slug, datos)
