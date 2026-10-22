@@ -695,6 +695,10 @@ if st.session_state.rol == "dueño":
     paginas.append("Estadísticas")
 pagina = st.sidebar.radio("Menú", paginas, format_func=lambda p: f"{ICONOS_MENU.get(p, '')}  {p}",
                           label_visibility="collapsed")
+# En celular/tableta el menu tapa la pantalla: al elegir una opcion se cierra solo
+if st.session_state.get("_pagina_anterior") not in (None, pagina):
+    ui.cerrar_menu_en_celular()
+st.session_state["_pagina_anterior"] = pagina
 st.sidebar.divider()
 with st.sidebar.expander(f"🔗 Link para que agenden los {V['clientes']}", expanded=True):
     st.markdown('<div class="ak-link-ayuda">Compártelo por WhatsApp o redes. '

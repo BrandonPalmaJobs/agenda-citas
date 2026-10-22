@@ -58,6 +58,10 @@ html, body, [data-testid="stApp"], [data-testid="stApp"] * {{
 [data-testid="stApp"] {{ background: {FONDO}; }}
 [data-testid="stMainBlockContainer"] {{ padding-top: 1.2rem; padding-bottom: 3rem; max-width: 1080px; }}
 
+/* iframes invisibles de scripts (ej. cerrar el menu en celular): sin hueco */
+[data-testid="stElementContainer"]:has(> iframe[height="0"]),
+[data-testid="stElementContainer"]:has(iframe[height="0"]) {{ display: none; }}
+
 /* Quitar la "marca" de Streamlit: encabezado, botones Fork/GitHub, anclas */
 [data-testid="stHeader"] {{ background: transparent; height: 0; }}
 [data-testid="stToolbarActions"], [data-testid="stMainMenu"] {{ display: none !important; }}
@@ -432,6 +436,29 @@ def tarjeta_cita_html(c, etiqueta_cliente):
         f'<div class="ak-cita-linea">{_h(etiqueta_cliente)}: <b>{_h(c["cliente_nombre"])}</b> · {_h(tel)}</div>'
         f'<div class="ak-cita-linea">{_h(c["servicio_nombre"])} · con <b>{_h(c["proveedor_nombre"])}</b></div>'
     )
+
+
+def cerrar_menu_en_celular():
+    """Cierra el menu lateral (sidebar) en pantallas chicas, como si se
+    hubiera tocado su boton de cerrar. Streamlit no tiene una funcion para
+    esto, asi que se hace con un script minimo (en un iframe invisible) que
+    actua sobre la pagina de la app. En computadora no hace nada."""
+    import time
+    import streamlit.components.v1 as components
+    # el comentario con la hora hace que Streamlit vuelva a correr el script
+    # cada vez (si el contenido fuera identico, no lo repetiria)
+    components.html(f"""<!-- {time.time()} --><script>
+    (function () {{
+      const w = window.parent, d = w.document;
+      if (w.innerWidth >= 992) return;
+      const sb = d.querySelector('[data-testid="stSidebar"]');
+      if (!sb || sb.getAttribute('aria-expanded') === 'false') return;
+      const boton = d.querySelector('[data-testid="stSidebarCollapseButton"] button')
+                 || d.querySelector('[data-testid="stSidebarHeader"] button')
+                 || sb.querySelector('button[kind="headerNoPadding"]');
+      if (boton) boton.click();
+    }})();
+    </script>""", height=0)
 
 
 def pie():

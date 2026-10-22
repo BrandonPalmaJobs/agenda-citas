@@ -1,0 +1,83 @@
+# Prueba automatica del panel en tamano CELULAR, con la app corriendo en un
+# servidor temporal de GitHub (localhost) y datos/claves de PRUEBA (nada real).
+# Entra al panel, abre el menu, elige una opcion y revisa que el menu se cierre.
+# Las capturas quedan en la rama "capturas". Correr a mano desde Actions.
+name: Prueba del panel en celular
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar
+        run: |
+          pip install -q -r requirements.txt playwright
+          python -m playwright install --with-deps chromium > /dev/null
+      - name: Datos y claves de prueba (solo para este servidor temporal)
+        run: |
+          mkdir -p .streamlit
+          printf 'staff_password = "prueba-staff-ci"\ndueno_password = "prueba-dueno-ci"\n' > .streamlit/secrets.toml
+          echo SI | python cargar_demo.py
+      - name: Levantar la app
+        run: |
+          nohup streamlit run app.py --server.headless true --server.port 8501 > streamlit.log 2>&1 &
+          for i in $(seq 1 60); do curl -s localhost:8501/_stcore/health && break; sleep 1; done
+      - name: Probar en tamano celular
+        run: |
+          python - <<'PY'
+          import re
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              b = p.chromium.launch()
+              ctx = b.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+              pg = ctx.new_page()
+              pg.goto("http://localhost:8501/?panel=staff", wait_until="networkidle")
+              pg.wait_for_timeout(4000)
+              pg.get_by_label("Clave de acceso").fill("prueba-dueno-ci")
+              pg.get_by_role("button", name="Entrar").click()
+              pg.wait_for_timeout(5000)
+              pg.screenshot(path="1_panel.png")
+              def estado():
+                  return pg.evaluate("""() => {
+                    const sb = document.querySelector('[data-testid="stSidebar"]');
+                    return sb ? sb.getAttribute('aria-expanded') : 'sin sidebar';
+                  }""")
+              print("Menu al entrar (aria-expanded):", estado())
+              print("Botones en el encabezado:", pg.evaluate("""() =>
+                  [...document.querySelectorAll('[data-testid]')].map(e => e.dataset.testid)
+                  .filter(t => /Sidebar|Collapse|Expand/i.test(t))"""))
+              if estado() != "true":
+                  for sel in ['[data-testid="stExpandSidebarButton"]', '[data-testid="stSidebarCollapsedControl"] button',
+                              '[data-testid="stExpandSidebarButton"] button']:
+                      if pg.locator(sel).count():
+                          pg.locator(sel).first.click(); break
+                  pg.wait_for_timeout(1500)
+              print("Menu abierto (aria-expanded):", estado())
+              pg.screenshot(path="2_menu_abierto.png")
+              pg.locator('[data-testid="stSidebar"]').get_by_text(re.compile("Pacientes")).first.click()
+              pg.wait_for_timeout(5000)
+              print("Tras elegir 'Pacientes' (aria-expanded):", estado())
+              pg.screenshot(path="3_tras_elegir.png")
+              b.close()
+          PY
+      - name: Log de la app
+        if: always()
+        run: tail -30 streamlit.log || true
+      - name: Guardar capturas en la rama "capturas"
+        if: always()
+        run: |
+          mkdir salida && mv *.png salida/ 2>/dev/null; cd salida
+          git init -q && git checkout -q -b capturas
+          git config user.name "capturas-bot" && git config user.email "capturas-bot@users.noreply.github.com"
+          git add . && git commit -q -m "Prueba celular $(date -u +%F_%H%M)"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" capturas
