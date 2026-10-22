@@ -132,7 +132,7 @@ def _respaldar(etiqueta):
     os.makedirs("respaldos", exist_ok=True)
     respaldo = {}
     with db.get_conn() as conn:
-        for tabla in ["negocio", "servicios", "proveedores", "clientes", "citas"]:
+        for tabla in ["negocio", "servicios", "proveedores", "clientes", "citas", "notas_consulta"]:
             respaldo[tabla] = [dict(r) for r in conn.execute(f"SELECT * FROM {tabla}")]
     marca = datetime.now().strftime("%Y%m%d_%H%M%S")
     ruta = os.path.join("respaldos", f"respaldo_antes_demo_{etiqueta}_{marca}.json")
@@ -213,6 +213,62 @@ def _generar_citas(ids_servicio, servicios_por_id, ids_dentista, ids_pacientes):
     return citas
 
 
+# Fichas medicas de ejemplo (ficticias): (alergias, padecimientos, medicamentos, tipo de sangre)
+FICHAS = [
+    ("Penicilina", "", "", "O+"),
+    ("", "Diabetes tipo 2", "Metformina 850 mg", "A+"),
+    ("Látex", "", "", "B+"),
+    ("", "Hipertensión", "Losartán 50 mg", "O+"),
+    ("Ibuprofeno", "Asma leve", "Salbutamol (inhalador)", "A-"),
+    ("", "", "", "O-"),
+    ("Anestesia con epinefrina", "Problemas cardiacos", "Aspirina 100 mg", "AB+"),
+    ("", "Embarazo (2do trimestre)", "Ácido fólico", "O+"),
+]
+# Notas por consulta segun el tratamiento
+NOTAS_POR_SERVICIO = {
+    "Limpieza dental": ["Limpieza y pulido sin complicaciones. Se recomienda hilo dental diario.",
+                        "Sarro moderado en inferiores. Próxima limpieza en 6 meses."],
+    "Resina (curación)": ["Resina en pieza 36, caries oclusal. Sin molestias al terminar.",
+                          "Resina en pieza 14. Revisar sensibilidad en la próxima visita."],
+    "Extracción simple": ["Extracción de pieza 48 sin complicaciones. Indicaciones de cuidado entregadas.",
+                          "Extracción de resto radicular. Control en 7 días."],
+    "Endodoncia": ["Endodoncia pieza 46, primera sesión. Curación temporal.",
+                   "Terminación de endodoncia. Pendiente corona."],
+    "Blanqueamiento": ["Blanqueamiento en consultorio, 3 ciclos. Evitar café y vino 48 h."],
+    "Ajuste de brackets": ["Cambio de arco 0.016 NiTi. Paciente refiere poca molestia.",
+                           "Ajuste mensual, se colocan ligas intermaxilares."],
+    "Valoración y diagnóstico": ["Valoración inicial: 2 caries, se propone plan de tratamiento.",
+                                 "Revisión general sin hallazgos importantes."],
+    "Valoración de ortodoncia": ["Apiñamiento moderado. Se piden radiografía panorámica y modelos."],
+}
+
+
+def _cargar_expedientes(ids_pacientes):
+    """Fichas medicas a ~8 pacientes y notas a parte de las citas completadas,
+    para que el expediente de la demo se vea con informacion."""
+    rnd = random.Random(7)
+    elegidos = rnd.sample(ids_pacientes, min(len(FICHAS), len(ids_pacientes)))
+    for cliente_id, (alergias, padecimientos, medicamentos, sangre) in zip(elegidos, FICHAS):
+        anio = rnd.randint(1965, 2005)
+        db.update_ficha_medica(cliente_id, alergias, padecimientos, medicamentos,
+                               f"Familiar · 55 0000 {rnd.randint(1000, 9999)}",
+                               f"{anio}-{rnd.randint(1, 12):02d}-{rnd.randint(1, 28):02d}", sangre)
+    with db.get_conn() as conn:
+        completadas = conn.execute(
+            """SELECT citas.id, citas.cliente_id, citas.fecha, servicios.nombre AS servicio
+               FROM citas JOIN servicios ON servicios.id = citas.servicio_id
+               WHERE citas.estado = 'Completada' ORDER BY citas.fecha""").fetchall()
+        filas = []
+        for c in completadas:
+            textos = NOTAS_POR_SERVICIO.get(c["servicio"])
+            if textos and rnd.random() < 0.45:
+                filas.append((c["cliente_id"], c["id"], c["fecha"], rnd.choice(["Dueño", "Personal"]),
+                              rnd.choice(textos), f"{c['fecha']}T20:00:00"))
+        _insertar_varios(conn, "notas_consulta",
+                         ["cliente_id", "cita_id", "fecha", "autor", "texto", "creada_el"], filas)
+    return len(elegidos), len(filas)
+
+
 def main():
     slug = sys.argv[1] if len(sys.argv) > 1 else ""
     if slug:
@@ -239,10 +295,10 @@ def main():
     print(f"Respaldo guardado en {ruta}  {conteos}")
 
     with db.get_conn() as conn:
-        for tabla in ["citas", "clientes", "servicios", "proveedores"]:
+        for tabla in ["notas_consulta", "citas", "clientes", "servicios", "proveedores"]:
             conn.execute(f"DELETE FROM {tabla}")
         try:
-            conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('citas','clientes','servicios','proveedores')")
+            conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('notas_consulta','citas','clientes','servicios','proveedores')")
         except Exception:
             pass
 
@@ -279,8 +335,10 @@ def main():
                          ["cliente_id", "proveedor_id", "servicio_id", "fecha", "hora_inicio", "hora_fin",
                           "estado", "notas", "creada_el", "recordatorio_enviado"], citas)
 
+    n_fichas, n_notas = _cargar_expedientes(ids_pacientes)
     print(f"Listo: {len(SERVICIOS)} servicios, {len(DENTISTAS)} dentistas, "
-          f"{len(PACIENTES)} pacientes y {len(citas)} citas cargadas.")
+          f"{len(PACIENTES)} pacientes y {len(citas)} citas cargadas, "
+          f"{n_fichas} fichas medicas y {n_notas} notas de consulta.")
 
 
 if __name__ == "__main__":
