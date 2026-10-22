@@ -8,3 +8,5 @@ respaldos/
 __pycache__/
 *.pyc
 *.log
+aika_config.py
+clientes/

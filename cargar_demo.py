@@ -255,6 +255,9 @@ def main():
     else:
         db.set_logo(None)
 
+    # La demo nunca vence (y la barra "DEMO" sale en su panel)
+    db.set_suscripcion(plan="demo")
+
     for nombre, dur, precio in SERVICIOS:
         db.add_servicio(nombre, dur, precio)
     for nombre, esp, _ in DENTISTAS:

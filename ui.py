@@ -359,13 +359,34 @@ def inyectar_estilos(color=None):
     _html(f"<style>:root {{ {variables} }}</style>" + _CSS)
 
 
-def barra_plataforma(es_demo):
-    if es_demo:
+def barra_plataforma(es_demo, admin=False):
+    if admin:
+        _html(
+            '<div class="ak-barra"><div><span class="ak-pill">ADMIN</span>'
+            'Panel de administración · <b>Aika Solutions</b></div>'
+            '<div class="ak-plan">Acceso <b>privado</b></div></div>'
+        )
+    elif es_demo:
         _html(
             '<div class="ak-barra"><div><span class="ak-pill">DEMO</span>'
             'Plataforma de agenda para clínicas y consultorios · Powered by <b>Aika Solutions</b></div>'
             '<div class="ak-plan">Plan activo: <b>Demo Enterprise</b></div></div>'
         )
+
+
+def escapar(texto):
+    return _h(texto)
+
+
+def chip_html(texto, fondo, color):
+    return f'<span class="ak-chip" style="background:{fondo};color:{color}">{_h(texto)}</span>'
+
+
+def aviso_bloqueo(titulo, mensaje):
+    _html(
+        '<div class="ak-landing" style="padding:36px 30px"><span class="ak-pill">AVISO</span>'
+        f'<h1 style="font-size:1.8rem">{_h(titulo)}</h1><p>{_h(mensaje)}</p></div>'
+    )
 
 
 def encabezado_negocio(negocio, subtitulo, icono):

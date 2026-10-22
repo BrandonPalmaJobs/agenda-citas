@@ -34,7 +34,9 @@ import os
 import turso_adapter
 import db
 import google_calendar
+import suscripcion
 import ui
+import admin
 
 
 def _recargar_si_cambio(*modulos):
@@ -55,13 +57,13 @@ def _recargar_si_cambio(*modulos):
 
 
 # turso_adapter primero: db y los demas dependen de el
-for _m in (turso_adapter, db, google_calendar, ui):
+for _m in (turso_adapter, db, google_calendar, suscripcion, ui, admin):
     if not hasattr(_m, "_fecha_cargado"):
         # primera vez en este proceso tras una actualizacion: recargar por si
         # el proceso traia una version vieja en memoria
         importlib.reload(_m)
         _m._fecha_cargado = os.path.getmtime(_m.__file__)
-_recargar_si_cambio(turso_adapter, db, google_calendar, ui)
+_recargar_si_cambio(turso_adapter, db, google_calendar, suscripcion, ui, admin)
 
 # Paleta de las graficas de Estadisticas: azul fuerte / gris claro / blanco.
 # Cancelada y No asistio quedan en tonos muy claros a proposito (pedido del
@@ -127,7 +129,10 @@ _es_raiz_de_plataforma = bool(
     not NEGOCIO_SLUG and _hay_varios_negocios() and not all(db.turso_adapter.credenciales_turso())
 )
 
-if _negocio_no_configurado or _es_raiz_de_plataforma:
+# Panel de administrador de Aika: URL raiz + ?panel=admin
+ES_ADMIN = not NEGOCIO_SLUG and st.query_params.get("panel") == "admin"
+
+if _negocio_no_configurado or _es_raiz_de_plataforma or ES_ADMIN:
     negocio = None
 else:
     db.init_db()
@@ -203,12 +208,32 @@ if _negocio_no_configurado:
     st.error(f"No encontramos configuración para el negocio '{NEGOCIO_SLUG}'. Revisa el link.")
     st.stop()
 
+if ES_ADMIN:
+    try:
+        _host = st.context.headers.get("host") or "localhost:8501"
+    except Exception:
+        _host = "localhost:8501"
+    _esquema = "http" if _host.startswith(("localhost", "127.0.0.1")) else "https"
+    admin.pagina(datetime.now(ZoneInfo("America/Mexico_City")).date(), f"{_esquema}://{_host}/")
+    st.stop()
+
 if _es_raiz_de_plataforma:
     ui.portada_plataforma()
     st.stop()
 
 
 ZONA_HORARIA_NEGOCIO = ZoneInfo("America/Mexico_City")
+
+# Suscripcion del negocio: si la prueba o el pago vencio (o esta suspendido),
+# se bloquea la agenda - ver suscripcion.py
+SUSCRIPCION = suscripcion.estado(negocio, datetime.now(ZONA_HORARIA_NEGOCIO).date())
+
+
+def _contacto_aika():
+    try:
+        return st.secrets.get("contacto_aika") or ""
+    except Exception:
+        return ""
 
 
 def ahora_negocio():
@@ -403,8 +428,14 @@ def precio_texto(precio):
 
 # ---------------------------------------------------------------- Vista publica: cliente se autoagenda
 def pagina_reservar_publica():
-    ui.barra_plataforma(ES_DEMO)
+    # Sin barra "DEMO" aqui: los pacientes nunca la ven (solo personal y dueno)
     ui.encabezado_negocio(negocio, V["subtitulo"], V["icono"])
+
+    if SUSCRIPCION["bloqueado"]:
+        st.info("La agenda en línea no está disponible por el momento. "
+                f"Por favor comunícate directamente con {negocio['nombre']} para agendar tu cita.")
+        ui.pie()
+        return
 
     servicios = db.list_servicios(solo_activos=True)
     proveedores = db.list_proveedores(solo_activos=True)
@@ -608,6 +639,24 @@ if "staff_autenticado" not in st.session_state:
 if "rol" not in st.session_state:
     st.session_state.rol = None
 
+if SUSCRIPCION["bloqueado"]:
+    ui.encabezado_negocio(negocio, "Panel privado del negocio", V["icono"])
+    if SUSCRIPCION["motivo"] == "suspendida":
+        titulo = "Tu cuenta está suspendida"
+        mensaje = "El acceso al panel y a la agenda en línea está pausado."
+    elif SUSCRIPCION["plan"] == "prueba":
+        titulo = "Tu prueba gratis terminó"
+        mensaje = ("Gracias por probar la agenda en línea. Tus datos están guardados: "
+                   "en cuanto actives tu suscripción, todo vuelve a funcionar tal como lo dejaste.")
+    else:
+        titulo = "Tu suscripción venció"
+        mensaje = ("Tus datos están guardados: en cuanto renueves, todo vuelve a funcionar "
+                   "tal como lo dejaste.")
+    contacto = _contacto_aika()
+    ui.aviso_bloqueo(titulo, mensaje + (f" Contacta a Aika Solutions: {contacto}" if contacto
+                                        else " Contacta a Aika Solutions para continuar."))
+    st.stop()
+
 if not st.session_state.staff_autenticado:
     ui.barra_plataforma(ES_DEMO)
     ui.encabezado_negocio(negocio, "Panel privado del negocio", V["icono"])
@@ -656,6 +705,9 @@ if st.sidebar.button("Cerrar sesión", use_container_width=True):
 st.sidebar.caption("Powered by Aika Solutions")
 
 ui.barra_plataforma(ES_DEMO)
+if SUSCRIPCION["aviso"]:
+    contacto = _contacto_aika()
+    st.warning(SUSCRIPCION["aviso"] + (f" ({contacto})" if contacto else ""))
 
 
 # ---------------------------------------------------------------- Agenda del dia

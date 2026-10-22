@@ -130,6 +130,13 @@ def _init_db():
             conn.execute("ALTER TABLE negocio ADD COLUMN logo_base64 TEXT")
         if "color_marca" not in columnas_negocio:
             conn.execute("ALTER TABLE negocio ADD COLUMN color_marca TEXT")
+        # Suscripcion (la administra Aika Solutions desde su panel):
+        #   plan: 'demo' | 'prueba' | 'activa' | 'suspendida' (vacio = sin vencimiento)
+        #   vence_el: 'YYYY-MM-DD' - desde el dia siguiente la agenda se bloquea
+        for columna, tipo in [("plan", "TEXT"), ("vence_el", "TEXT"), ("precio_mensual", "REAL"),
+                              ("alta_el", "TEXT"), ("notas_admin", "TEXT")]:
+            if columna not in columnas_negocio:
+                conn.execute(f"ALTER TABLE negocio ADD COLUMN {columna} {tipo}")
 
 
 # ---------- Memoria (cache) de lo que casi no cambia ----------
@@ -204,6 +211,34 @@ def set_logo(logo_base64):
     with get_conn() as conn:
         conn.execute("UPDATE negocio SET logo_base64=? WHERE id=1", (logo_base64,))
     limpiar_cache()
+
+
+def set_suscripcion(plan=None, vence_el=None, precio_mensual=None, notas_admin=None, alta_el=None):
+    """Cambia solo los campos que se pasan (los None se dejan como estan)."""
+    campos = {"plan": plan, "vence_el": vence_el, "precio_mensual": precio_mensual,
+              "notas_admin": notas_admin, "alta_el": alta_el}
+    campos = {k: v for k, v in campos.items() if v is not None}
+    if not campos:
+        return
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE negocio SET " + ", ".join(f"{k}=?" for k in campos) + " WHERE id=1",
+            list(campos.values()),
+        )
+    limpiar_cache()
+
+
+def resumen_admin(desde_iso, hasta_iso):
+    """Numeros de un negocio para el panel de administrador de Aika."""
+    with get_conn() as conn:
+        pacientes = conn.execute("SELECT COUNT(*) FROM clientes").fetchone()[0]
+        citas_mes = conn.execute(
+            "SELECT COUNT(*) FROM citas WHERE fecha BETWEEN ? AND ? AND estado != 'Cancelada'",
+            (desde_iso, hasta_iso)).fetchone()[0]
+        citas_total = conn.execute("SELECT COUNT(*) FROM citas").fetchone()[0]
+        ultima = conn.execute("SELECT MAX(creada_el) FROM citas").fetchone()[0]
+    return {"pacientes": pacientes, "citas_mes": citas_mes, "citas_total": citas_total,
+            "ultima_cita_creada": ultima}
 
 
 def set_color(color_hex):
