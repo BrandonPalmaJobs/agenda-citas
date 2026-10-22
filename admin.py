@@ -119,10 +119,11 @@ def pagina(hoy, url_base):
     with st.expander("➕ Dar de alta una clínica nueva"):
         st.markdown(
             "1. En tu PC, en la carpeta `agenda_citas`, haz doble clic en **`nuevo_cliente.bat`** y "
-            "contesta lo que te pregunta (nombre, giro, color, logo).\n"
-            "2. Al final te muestra un bloque `[negocios.…]`: pégalo en **Secrets** de Streamlit Cloud "
-            "y guarda.\n"
-            "3. Listo: aparece aquí con **14 días de prueba**, y el script te da sus links y contraseñas."
+            "contesta lo que te pregunta (nombre, giro, color, logo, dirección de su app).\n"
+            "2. El script te guía para crear **su propia app** en Streamlit (mismo código) y pegar sus Secrets.\n"
+            "3. Pega su bloque `[negocios.…]` al final de los Secrets de **esta** app para verla aquí.\n"
+            "4. Agrega su dirección a `despertar_urls.txt` en GitHub para que nunca se duerma.\n\n"
+            "Queda con **14 días de prueba**; el script te da sus links y contraseñas."
         )
 
     orden = {"suspendida": 0, "prueba": 1, "activa": 2, "demo": 3, "": 4}
@@ -154,7 +155,12 @@ def _tarjeta_clinica(slug, datos, negocio, resumen, est, hoy, url_base):
     else:
         vence_txt = "sin vencimiento"
     precio = negocio.get("precio_mensual")
-    link_pacientes = f"{url_base}?negocio={slug}"
+    if datos.get("url_app"):  # clinica con su propia app (opcion B)
+        link_pacientes = datos["url_app"].rstrip("/") + "/"
+        link_panel = link_pacientes + "?panel=staff"
+    else:                     # clinica dentro de esta app (?negocio=)
+        link_pacientes = f"{url_base}?negocio={slug}"
+        link_panel = link_pacientes + "&panel=staff"
     st.markdown(
         f'<div class="ak-cita-hora">{ui.escapar(negocio["nombre"])} &nbsp;{chip}</div>'
         f'<div class="ak-cita-linea">{ui.escapar(negocio["tipo"])} · <code>{ui.escapar(slug)}</code> · '
@@ -164,7 +170,7 @@ def _tarjeta_clinica(slug, datos, negocio, resumen, est, hoy, url_base):
         unsafe_allow_html=True)
 
     with st.expander("Administrar"):
-        st.markdown(f"Link de pacientes: {link_pacientes}  \nPanel: {link_pacientes}&panel=staff")
+        st.markdown(f"Link de pacientes: {link_pacientes}  \nPanel: {link_panel}")
         db.usar_turso(datos.get("turso_database_url"), datos.get("turso_auth_token"))
         try:
             base = _base_para_extender(est, hoy)

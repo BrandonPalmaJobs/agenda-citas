@@ -130,7 +130,9 @@ _es_raiz_de_plataforma = bool(
 )
 
 # Panel de administrador de Aika: URL raiz + ?panel=admin
-ES_ADMIN = not NEGOCIO_SLUG and st.query_params.get("panel") == "admin"
+# (solo en la app de la plataforma - la que tiene [negocios.X] en Secrets; en la
+# app propia de una clinica, ?panel=admin no existe)
+ES_ADMIN = not NEGOCIO_SLUG and st.query_params.get("panel") == "admin" and _hay_varios_negocios()
 
 if _negocio_no_configurado or _es_raiz_de_plataforma or ES_ADMIN:
     negocio = None

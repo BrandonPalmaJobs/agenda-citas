@@ -1,0 +1,4 @@
+# Apps que el "despertador" (GitHub Actions) visita cada hora para que nunca
+# se duerman. Una direccion por linea. Al dar de alta una clinica nueva con su
+# propia app, agrega aqui su direccion (https://<nombre>.streamlit.app/).
+https://clinicadentalaikasolutions.streamlit.app/?negocio=demo

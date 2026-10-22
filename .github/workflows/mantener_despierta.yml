@@ -1,4 +1,4 @@
-# Abre la app CADA HORA con un navegador real (como si fuera un visitante)
+# Abre CADA HORA todas las apps listadas en despertar_urls.txt con un navegador real (como si fuera un visitante)
 # para que Streamlit Community Cloud nunca la duerma por inactividad. Si la
 # encuentra dormida, le da clic a "Yes, get this app back up!".
 #
@@ -22,10 +22,11 @@ jobs:
   despertar:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      APP_URLS: >-
-        https://clinicadentalaikasolutions.streamlit.app/?negocio=demo
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: despertar_urls.txt
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -40,9 +41,16 @@ jobs:
           from playwright.sync_api import sync_playwright
           with sync_playwright() as p:
               navegador = p.chromium.launch()
-              for url in os.environ["APP_URLS"].split():
+              urls = [l.strip() for l in open("despertar_urls.txt", encoding="utf-8")
+                      if l.strip() and not l.strip().startswith("#")]
+              for url in urls:
                   pagina = navegador.new_page()
-                  pagina.goto(url, wait_until="domcontentloaded", timeout=90000)
+                  try:
+                      pagina.goto(url, wait_until="domcontentloaded", timeout=90000)
+                  except Exception as e:
+                      print(f"{url}: no se pudo abrir ({e})")
+                      pagina.close()
+                      continue
                   pagina.wait_for_timeout(8000)
                   boton = pagina.get_by_role("button", name=re.compile("get this app back up", re.I))
                   if boton.count():

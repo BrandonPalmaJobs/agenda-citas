@@ -10,8 +10,9 @@ Te pregunta nombre, giro, color y logo, y entonces:
   2. La deja lista: nombre, giro, horario base, color, logo y PRUEBA GRATIS
      de 14 dias (se bloquea sola al vencer; la extiendes desde ?panel=admin).
   3. Genera sus contrasenas (personal y dueno).
-  4. Agrega su bloque a .streamlit/secrets.toml de esta carpeta y te lo
-     muestra para que lo pegues en Secrets de Streamlit Cloud.
+  4. Te da los pasos para crear SU PROPIA app de Streamlit (mismo codigo,
+     su propia direccion: <nombre>.streamlit.app) con sus Secrets, y el
+     bloque para registrarla en tu panel de administrador.
   5. Guarda una ficha con sus links y contrasenas en clientes/<nombre>.txt
      (esa carpeta no se sube a GitHub).
 """
@@ -31,7 +32,10 @@ import requests
 import db
 import suscripcion
 
+# App de la demo: ahi vive tu panel de administrador (?panel=admin) y ahi se
+# registra cada clinica para que aparezca en tu lista.
 URL_APP = "https://clinicadentalaikasolutions.streamlit.app/"
+REPO = "BrandonPalmaJobs/agenda-citas"
 TIPOS = db.TIPOS_NEGOCIO  # ["Consultorio medico", "Consultorio dental", "Barberia", "Otro"]
 PALABRAS = ["sol", "luna", "mar", "rio", "cielo", "nube", "roca", "flor", "pino", "lago",
             "brisa", "faro", "puma", "oso", "lince", "halcon", "coral", "jade", "onix", "ambar"]
@@ -129,11 +133,23 @@ def main():
 
     slug = a_slug(nombre)
     while True:
-        slug = a_slug(preguntar("Identificador para el link (?negocio=...)", slug))
+        slug = a_slug(preguntar("Identificador interno corto (sin espacios)", slug))
         if slug in existentes:
             print(f"  Ya existe un negocio '{slug}'. Elige otro.")
             continue
         break
+
+    # Cada clinica tiene SU PROPIA app de Streamlit (mismo codigo de GitHub):
+    # https://<subdominio>.streamlit.app
+    sugerido = re.sub(r"[^a-z0-9]", "", unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore")
+                      .decode().lower())[:40] or slug.replace("-", "")
+    while True:
+        subdominio = preguntar("Direccion de su app (solo letras, numeros y guiones) -> ____.streamlit.app",
+                               sugerido).lower().replace(".streamlit.app", "").strip("/ ")
+        if re.fullmatch(r"[a-z0-9][a-z0-9-]{2,62}", subdominio):
+            break
+        print("  Usa solo letras minusculas, numeros y guiones (minimo 3).")
+    url_app_clinica = f"https://{subdominio}.streamlit.app/"
 
     color = preguntar("Color de la marca en formato #RRGGBB (Enter = verde azulado de Aika)", "", False)
     if color and not color.startswith("#"):
@@ -186,46 +202,74 @@ def main():
 
     clave_staff = clave_nueva("staff")
     clave_dueno = clave_nueva("dueno")
-    bloque = (
-        f"\n[negocios.{slug}]\n"
+    contacto = datos_secrets.get("contacto_aika", "")
+
+    # BLOQUE 1 - Secrets de la app PROPIA de la clinica (solo sus datos)
+    bloque_app = (
         f'turso_database_url = "{url}"\n'
         f'turso_auth_token = "{token}"\n'
         f'staff_password = "{clave_staff}"\n'
         f'dueno_password = "{clave_dueno}"\n'
+        + (f'contacto_aika = "{contacto}"\n' if contacto else "")
+    )
+    # BLOQUE 2 - registro en la app de la demo, para tu panel de administrador
+    # (sin contrasenas: desde la demo nadie puede entrar al panel de la clinica)
+    bloque_registro = (
+        f"\n[negocios.{slug}]\n"
+        f'turso_database_url = "{url}"\n'
+        f'turso_auth_token = "{token}"\n'
+        f'url_app = "{url_app_clinica}"\n'
     )
 
     os.makedirs(".streamlit", exist_ok=True)
     with open(ruta_secrets, "a", encoding="utf-8") as f:
         if texto_secrets and not texto_secrets.endswith("\n"):
             f.write("\n")
-        f.write(bloque)
+        f.write(bloque_registro)
 
-    link = f"{URL_APP}?negocio={slug}"
     ficha = (
         f"{nombre} ({tipo})\n"
         f"Alta: {hoy.strftime('%d/%m/%Y')} · Prueba gratis hasta: {vence.strftime('%d/%m/%Y')} · "
         f"Precio: ${precio:,.0f}/mes\n\n"
-        f"Link para sus pacientes:  {link}\n"
-        f"Panel (personal y dueño): {link}&panel=staff\n"
+        f"Link para sus pacientes:  {url_app_clinica}\n"
+        f"Panel (personal y dueño): {url_app_clinica}?panel=staff\n"
         f"Contraseña personal:      {clave_staff}\n"
         f"Contraseña dueño:         {clave_dueno}\n"
     )
     os.makedirs("clientes", exist_ok=True)
     ruta_ficha = os.path.join("clientes", f"{slug}.txt")
     with open(ruta_ficha, "w", encoding="utf-8") as f:
-        f.write(ficha)
+        f.write(ficha + "\n--- Secrets de su app ---\n" + bloque_app)
 
-    print("\n" + "=" * 62)
-    print("  LISTO. Falta UN paso: pegar esto al FINAL de Secrets en")
-    print("  Streamlit Cloud (Manage app > Settings > Secrets) y guardar:")
-    print("=" * 62)
-    print(bloque)
-    print("=" * 62)
+    linea = "=" * 62
+    print(f"\n{linea}\n  SU BASE YA QUEDO LISTA. Faltan 3 pasos (unos 5 minutos):\n{linea}")
+    print(f"""
+PASO 1 - Crear SU app en Streamlit
+  a) Entra a https://share.streamlit.io y dale "Create app"
+     -> "Deploy a public app from GitHub".
+  b) Repository: {REPO}   Branch: main   Main file path: app.py
+  c) App URL: {subdominio}
+  d) "Advanced settings": Python 3.12, y en "Secrets" pega ESTO:
+{linea}
+{bloque_app}{linea}
+  e) Dale "Deploy" y espera 1-2 minutos.
+
+PASO 2 - Registrarla en TU panel de administrador
+  En la app de la demo ({URL_APP}) -> Manage app -> Settings -> Secrets,
+  pega esto AL FINAL y guarda:
+{linea}{bloque_registro}{linea}
+  (Esto ya quedo agregado tambien en .streamlit/secrets.toml de esta carpeta.)
+
+PASO 3 - Que nunca se duerma
+  En GitHub abre el archivo despertar_urls.txt del repositorio, dale al lapiz
+  (editar), agrega esta linea y guarda ("Commit changes"):
+      {url_app_clinica}
+""")
+    print(linea)
     print(ficha)
-    print(f"(Esta ficha quedo guardada en {ruta_ficha} - no se sube a GitHub)")
+    print(f"(Ficha y Secrets guardados en {ruta_ficha} - esa carpeta no se sube a GitHub)")
     print("Al vencer la prueba, la agenda se bloquea sola. Para extenderla o")
     print(f"marcar que ya pago: {URL_APP}?panel=admin")
-
 
 if __name__ == "__main__":
     try:
