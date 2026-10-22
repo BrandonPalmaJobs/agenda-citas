@@ -38,6 +38,27 @@ import suscripcion
 URL_APP = "https://clinicadentalaikasolutions.streamlit.app/"
 REPO = "BrandonPalmaJobs/agenda-citas"
 TIPOS = db.TIPOS_NEGOCIO  # ["Consultorio medico", "Consultorio dental", "Barberia", "Otro"]
+# Servicios tipicos por giro: (nombre, minutos, precio sugerido MXN). La clinica
+# los ajusta despues desde su panel (Servicios).
+PLANTILLAS_SERVICIOS = {
+    "Consultorio dental": [
+        ("Valoración y diagnóstico", 30, 350), ("Limpieza dental", 45, 750),
+        ("Resina (curación)", 60, 950), ("Extracción simple", 45, 1200),
+        ("Blanqueamiento", 90, 3800), ("Endodoncia", 90, 4500),
+        ("Ajuste de brackets", 30, 800), ("Valoración de ortodoncia", 30, 400),
+    ],
+    "Consultorio medico": [
+        ("Consulta general", 30, 500), ("Consulta de seguimiento", 20, 400),
+        ("Revisión de estudios", 20, 350), ("Certificado médico", 15, 300),
+        ("Aplicación de inyección", 15, 150), ("Toma de presión y glucosa", 10, 100),
+    ],
+    "Barberia": [
+        ("Corte de cabello", 30, 200), ("Corte y barba", 60, 320), ("Arreglo de barba", 30, 150),
+        ("Corte para niño", 30, 150), ("Corte y cejas", 30, 230), ("Afeitado clásico", 30, 180),
+    ],
+    "Otro": [("Consulta", 30, 400), ("Sesión", 60, 600)],
+}
+
 PALABRAS = ["sol", "luna", "mar", "rio", "cielo", "nube", "roca", "flor", "pino", "lago",
             "brisa", "faro", "puma", "oso", "lince", "halcon", "coral", "jade", "onix", "ambar"]
 
@@ -169,6 +190,13 @@ def main():
         else:
             print("  No encontre ese archivo; se da de alta sin logo (lo pueden subir desde su panel).")
 
+    plantilla = PLANTILLAS_SERVICIOS.get(tipo, PLANTILLAS_SERVICIOS["Otro"])
+    print(f"Servicios tipicos de '{tipo}': " + ", ".join(n for n, _d, _p in plantilla))
+    usar_plantilla = preguntar("Cargarlos con precio sugerido? (S/n)", "S").strip().upper() != "N"
+    personal = [n.strip() for n in preguntar(
+        "Nombres de quienes atienden, separados por coma (Enter = lo cargan ellos despues)",
+        "", False).split(",") if n.strip()]
+
     dias = int(preguntar("Dias de prueba gratis", str(suscripcion.DIAS_PRUEBA)))
     print("Plan:")
     niveles = list(suscripcion.NIVELES.keys())
@@ -197,6 +225,11 @@ def main():
             print("Cancelado.")
             return
     db.set_negocio(nombre, tipo, "09:00", "18:00", ["Lun", "Mar", "Mie", "Jue", "Vie"], 30)
+    if usar_plantilla:
+        for nombre_s, minutos, precio_s in plantilla:
+            db.add_servicio(nombre_s, minutos, precio_s)
+    for nombre_p in personal:
+        db.add_proveedor(nombre_p, "")
     if logo_b64:
         db.set_logo(logo_b64)
     if color:
@@ -251,6 +284,10 @@ def main():
         f"Panel (personal y dueño): {url_app_clinica}?panel=staff\n"
         f"Contraseña personal:      {clave_staff}\n"
         f"Contraseña dueño:         {clave_dueno}\n"
+        + (f"\nServicios cargados: {len(plantilla) if usar_plantilla else 0} · "
+           f"Personal cargado: {len(personal)}"
+           + ("" if usar_plantilla and personal else
+              "  (lo que falte lo cargan desde su panel: Servicios / Personal)") + "\n")
     )
     os.makedirs("clientes", exist_ok=True)
     ruta_ficha = os.path.join("clientes", f"{slug}.txt")
