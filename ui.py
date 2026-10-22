@@ -65,6 +65,11 @@ html, body, [data-testid="stApp"], [data-testid="stApp"] * {{
 /* Quitar la "marca" de Streamlit: encabezado, botones Fork/GitHub, anclas */
 [data-testid="stHeader"] {{ background: transparent; height: 0; }}
 [data-testid="stToolbarActions"], [data-testid="stMainMenu"] {{ display: none !important; }}
+/* Toda la barra de herramientas de Streamlit (Fork, GitHub, Share, Deploy, menu...),
+   tambien la que ve el dueno de la cuenta de Streamlit. Los botones para abrir/cerrar
+   el menu lateral NO estan aqui dentro, asi que siguen funcionando. */
+[data-testid="stToolbar"], [data-testid="stAppDeployButton"], .stAppDeployButton,
+[data-testid="stStatusWidget"] {{ display: none !important; }}
 [data-testid="stHeaderActionElements"] {{ display: none !important; }}
 footer {{ visibility: hidden; }}
 
