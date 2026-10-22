@@ -128,13 +128,64 @@ def _init_db():
             conn.execute("ALTER TABLE negocio ADD COLUMN descanso_fin TEXT")
         if "logo_base64" not in columnas_negocio:
             conn.execute("ALTER TABLE negocio ADD COLUMN logo_base64 TEXT")
+        if "color_marca" not in columnas_negocio:
+            conn.execute("ALTER TABLE negocio ADD COLUMN color_marca TEXT")
+
+
+# ---------- Memoria (cache) de lo que casi no cambia ----------
+# Datos del negocio, servicios y personal se leen en CADA clic pero casi nunca
+# cambian: se guardan en memoria unos segundos por base de datos, y cualquier
+# cambio hecho desde la app (set_negocio, add_servicio, ...) borra la memoria
+# de ESE negocio al instante, asi que nunca se ve informacion vieja tras editar.
+import threading
+import time
+
+_CACHE_SEGUNDOS = 120
+_cache = {}
+_cache_lock = threading.Lock()
+
+
+def _base_actual():
+    return turso_adapter.credenciales_turso()[0] or DB_PATH
+
+
+def _cacheado(nombre, calcular):
+    clave = (_base_actual(), nombre)
+    ahora = time.monotonic()
+    with _cache_lock:
+        guardado = _cache.get(clave)
+        if guardado and ahora - guardado[0] < _CACHE_SEGUNDOS:
+            return _copiar(guardado[1])
+    valor = calcular()
+    with _cache_lock:
+        _cache[clave] = (ahora, valor)
+    return _copiar(valor)
+
+
+def _copiar(valor):
+    # copias para que quien use el resultado no modifique lo guardado
+    if isinstance(valor, list):
+        return [dict(v) for v in valor]
+    if isinstance(valor, dict):
+        return dict(valor)
+    return valor
+
+
+def limpiar_cache():
+    """Olvida lo guardado en memoria del negocio actual."""
+    base = _base_actual()
+    with _cache_lock:
+        for clave in [k for k in _cache if k[0] == base]:
+            del _cache[clave]
 
 
 # ---------- Negocio ----------
 
 def get_negocio():
-    with get_conn() as conn:
-        return dict(conn.execute("SELECT * FROM negocio WHERE id = 1").fetchone())
+    def leer():
+        with get_conn() as conn:
+            return dict(conn.execute("SELECT * FROM negocio WHERE id = 1").fetchone())
+    return _cacheado("negocio", leer)
 
 
 def set_negocio(nombre, tipo, hora_apertura, hora_cierre, dias_laborales, intervalo_min,
@@ -146,25 +197,36 @@ def set_negocio(nombre, tipo, hora_apertura, hora_cierre, dias_laborales, interv
             (nombre, tipo, hora_apertura, hora_cierre, ",".join(dias_laborales), intervalo_min,
              descanso_inicio or None, descanso_fin or None),
         )
+    limpiar_cache()
 
 
 def set_logo(logo_base64):
     with get_conn() as conn:
         conn.execute("UPDATE negocio SET logo_base64=? WHERE id=1", (logo_base64,))
+    limpiar_cache()
+
+
+def set_color(color_hex):
+    with get_conn() as conn:
+        conn.execute("UPDATE negocio SET color_marca=? WHERE id=1", (color_hex or None,))
+    limpiar_cache()
 
 
 # ---------- Servicios ----------
 
 def list_servicios(solo_activos=False):
-    with get_conn() as conn:
-        q = "SELECT * FROM servicios" + (" WHERE activo=1" if solo_activos else "") + " ORDER BY nombre"
-        return [dict(r) for r in conn.execute(q)]
+    def leer():
+        with get_conn() as conn:
+            return [dict(r) for r in conn.execute("SELECT * FROM servicios ORDER BY nombre")]
+    todos = _cacheado("servicios", leer)
+    return [s for s in todos if s["activo"]] if solo_activos else todos
 
 
 def add_servicio(nombre, duracion_min, precio):
     with get_conn() as conn:
         conn.execute("INSERT INTO servicios (nombre, duracion_min, precio) VALUES (?, ?, ?)",
                      (nombre, duracion_min, precio))
+    limpiar_cache()
 
 
 def update_servicio(servicio_id, nombre, duracion_min, precio, activo):
@@ -173,25 +235,30 @@ def update_servicio(servicio_id, nombre, duracion_min, precio, activo):
             "UPDATE servicios SET nombre=?, duracion_min=?, precio=?, activo=? WHERE id=?",
             (nombre, duracion_min, precio, int(activo), servicio_id),
         )
+    limpiar_cache()
 
 
 # ---------- Proveedores (personal) ----------
 
 def list_proveedores(solo_activos=False):
-    with get_conn() as conn:
-        q = "SELECT * FROM proveedores" + (" WHERE activo=1" if solo_activos else "") + " ORDER BY nombre"
-        return [dict(r) for r in conn.execute(q)]
+    def leer():
+        with get_conn() as conn:
+            return [dict(r) for r in conn.execute("SELECT * FROM proveedores ORDER BY nombre")]
+    todos = _cacheado("proveedores", leer)
+    return [p for p in todos if p["activo"]] if solo_activos else todos
 
 
 def add_proveedor(nombre, especialidad):
     with get_conn() as conn:
         conn.execute("INSERT INTO proveedores (nombre, especialidad) VALUES (?, ?)", (nombre, especialidad))
+    limpiar_cache()
 
 
 def update_proveedor(proveedor_id, nombre, especialidad, activo):
     with get_conn() as conn:
         conn.execute("UPDATE proveedores SET nombre=?, especialidad=?, activo=? WHERE id=?",
                      (nombre, especialidad, int(activo), proveedor_id))
+    limpiar_cache()
 
 
 # ---------- Clientes ----------

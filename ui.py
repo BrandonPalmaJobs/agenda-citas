@@ -14,7 +14,9 @@ import html
 
 import streamlit as st
 
-# Paleta de la marca
+# Paleta de la marca (Aika). El color principal de cada clinica puede ser
+# otro: se guarda en la base (negocio.color_marca) y paleta() calcula sus tonos.
+COLOR_PREDETERMINADO = "#0F766E"
 TEAL = "#0F766E"
 TEAL_MEDIO = "#14B8A6"
 TEAL_CLARO = "#F0FDFA"
@@ -36,7 +38,7 @@ COLOR_ESTADO = {
 }
 _CHIP_ESTADO = {
     "Agendada": ("#EEF2FF", "#4338CA", "Agendada"),
-    "Completada": (TEAL_CLARO, TEAL, "Completada"),
+    "Completada": ("var(--ak-p-claro)", "var(--ak-p-oscuro)", "Completada"),
     "Cancelada": ("#F1F5F9", "#475569", "Cancelada"),
     "No asistio": ("#FFFBEB", "#B45309", "No asistió"),
 }
@@ -67,19 +69,19 @@ h1 {{ font-weight: 800 !important; }}
 
 /* Botones */
 [data-testid="stBaseButton-primary"], [data-testid="stBaseButton-primaryFormSubmit"] {{
-    background: {TEAL} !important; border: 1px solid {TEAL} !important; color: #fff !important;
+    background: var(--ak-p) !important; border: 1px solid var(--ak-p) !important; color: var(--ak-p-texto) !important;
     border-radius: 12px !important; font-weight: 700 !important;
-    box-shadow: 0 6px 16px -8px rgba(15,118,110,.55);
+    box-shadow: 0 6px 16px -8px var(--ak-p-sombra);
 }}
 [data-testid="stBaseButton-primary"]:hover, [data-testid="stBaseButton-primaryFormSubmit"]:hover {{
-    background: #0B5F59 !important; border-color: #0B5F59 !important;
+    background: var(--ak-p-oscuro) !important; border-color: var(--ak-p-oscuro) !important;
 }}
 [data-testid="stBaseButton-secondary"], [data-testid="stBaseButton-secondaryFormSubmit"] {{
     border-radius: 12px !important; border: 1px solid {BORDE} !important; background: #fff !important;
     color: {TEXTO} !important; font-weight: 600 !important;
 }}
 [data-testid="stBaseButton-secondary"]:hover, [data-testid="stBaseButton-secondaryFormSubmit"]:hover {{
-    border-color: {TEAL} !important; color: {TEAL} !important;
+    border-color: var(--ak-p) !important; color: var(--ak-p) !important;
 }}
 
 /* Campos */
@@ -128,12 +130,12 @@ h1 {{ font-weight: 800 !important; }}
     transition: border-color .15s, box-shadow .15s, background .15s, transform .15s;
 }}
 .st-key-tarjetas_servicio [role="radiogroup"] > div:hover,
-.st-key-tarjetas_especialista [role="radiogroup"] > div:hover {{ border-color: {TEAL_BORDE}; transform: translateY(-1px); }}
+.st-key-tarjetas_especialista [role="radiogroup"] > div:hover {{ border-color: var(--ak-p-borde); transform: translateY(-1px); }}
 .st-key-tarjetas_servicio [role="radiogroup"] > div[data-selected="true"],
 .st-key-tarjetas_especialista [role="radiogroup"] > div[data-selected="true"],
 .st-key-tarjetas_servicio [role="radiogroup"] > div:has(input:checked),
 .st-key-tarjetas_especialista [role="radiogroup"] > div:has(input:checked) {{
-    border-color: {TEAL}; background: {TEAL_CLARO}; box-shadow: 0 0 0 3px rgba(20,184,166,.16);
+    border-color: var(--ak-p); background: var(--ak-p-claro); box-shadow: 0 0 0 3px var(--ak-p-anillo);
 }}
 /* toda la tarjeta es clickeable: el label se "estira" sobre la tarjeta */
 .st-key-tarjetas_servicio [data-testid="stRadioOption"],
@@ -187,8 +189,8 @@ h1 {{ font-weight: 800 !important; }}
 [data-testid="stSidebar"] [data-testid="stRadioOption"]::after {{ content: ""; position: absolute; inset: 0; }}
 [data-testid="stSidebar"] [data-testid="stRadioOption"] > div > div:first-child {{ display: none !important; }}
 [data-testid="stSidebar"] [role="radiogroup"] > div:hover {{ background: rgba(255,255,255,.06); }}
-[data-testid="stSidebar"] [role="radiogroup"] > div[data-selected="true"] {{ background: rgba(20,184,166,.18); }}
-[data-testid="stSidebar"] [role="radiogroup"] > div[data-selected="true"] p {{ color: #5EEAD4 !important; font-weight: 700; }}
+[data-testid="stSidebar"] [role="radiogroup"] > div[data-selected="true"] {{ background: var(--ak-p-anillo); }}
+[data-testid="stSidebar"] [role="radiogroup"] > div[data-selected="true"] p {{ color: var(--ak-p-brillante) !important; font-weight: 700; }}
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] {{
     background: rgba(255,255,255,.06) !important; border-color: rgba(255,255,255,.12) !important; color: #E2E8F0 !important;
 }}
@@ -205,15 +207,15 @@ h1 {{ font-weight: 800 !important; }}
     background: #020617 !important; border-radius: 10px !important;
 }}
 [data-testid="stSidebar"] [data-testid="stCode"] pre {{
-    border: 1.5px solid {TEAL_MEDIO} !important; padding: 12px 44px 12px 12px !important;
+    border: 1.5px solid var(--ak-p-medio) !important; padding: 12px 44px 12px 12px !important;
 }}
 [data-testid="stSidebar"] [data-testid="stCode"] code,
 [data-testid="stSidebar"] [data-testid="stCode"] code * {{
-    color: #5EEAD4 !important; background: transparent !important; font-weight: 600;
+    color: var(--ak-p-brillante) !important; background: transparent !important; font-weight: 600;
     white-space: pre-wrap !important; word-break: break-all !important; font-size: .82rem !important;
 }}
 [data-testid="stSidebar"] [data-testid="stCode"] button {{
-    opacity: 1 !important; visibility: visible !important; background: {TEAL_MEDIO} !important;
+    opacity: 1 !important; visibility: visible !important; background: var(--ak-p-medio) !important;
     border: none !important; border-radius: 8px !important; color: #04201D !important;
 }}
 [data-testid="stSidebar"] [data-testid="stCode"] button * {{ color: #04201D !important; fill: #04201D !important; }}
@@ -237,12 +239,12 @@ h1 {{ font-weight: 800 !important; }}
 .ak-logo {{ width: 60px; height: 60px; border-radius: 16px; object-fit: contain; background: #fff; border: 1px solid {BORDE}; }}
 .ak-logo-ph {{
     width: 60px; height: 60px; border-radius: 16px; display: flex; align-items: center; justify-content: center;
-    background: linear-gradient(135deg, {TEAL} 0%, {TEAL_MEDIO} 100%); font-size: 30px;
+    background: linear-gradient(135deg, var(--ak-p) 0%, var(--ak-p-medio) 100%); font-size: 30px;
 }}
 .ak-nombre {{ font-size: 1.35rem; font-weight: 800; color: {TEXTO}; line-height: 1.15; letter-spacing: -0.02em; }}
 .ak-sub {{ color: {TEXTO_SUAVE}; font-size: .88rem; margin-top: 2px; }}
 .ak-kicker {{
-    display: inline-block; background: {TEAL_CLARO}; color: {TEAL}; border: 1px solid {TEAL_BORDE};
+    display: inline-block; background: var(--ak-p-claro); color: var(--ak-p); border: 1px solid var(--ak-p-borde);
     border-radius: 999px; padding: 3px 12px; font-size: .72rem; font-weight: 800; letter-spacing: .08em;
 }}
 .ak-titulo {{ font-size: 1.75rem; font-weight: 800; color: {TEXTO}; margin: 10px 0 2px; letter-spacing: -0.02em; }}
@@ -250,7 +252,7 @@ h1 {{ font-weight: 800 !important; }}
 .ak-sep {{ height: 1px; background: {BORDE}; margin: 14px 0 6px; }}
 .ak-paso {{ display: flex; align-items: center; gap: 10px; font-weight: 700; color: {TEXTO}; margin: 18px 0 8px; }}
 .ak-num {{
-    width: 26px; height: 26px; border-radius: 999px; background: {TEAL}; color: #fff; display: inline-flex;
+    width: 26px; height: 26px; border-radius: 999px; background: var(--ak-p); color: var(--ak-p-texto); display: inline-flex;
     align-items: center; justify-content: center; font-size: .8rem; font-weight: 800; flex: none;
 }}
 .ak-kpis {{ display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; margin: 4px 0 18px; }}
@@ -267,9 +269,9 @@ h1 {{ font-weight: 800 !important; }}
 .ak-cita-linea {{ color: {TEXTO_SUAVE}; font-size: .9rem; margin-top: 2px; }}
 .ak-cita-linea b {{ color: {TEXTO}; font-weight: 600; }}
 .ak-pie {{ text-align: center; color: #94A3B8; font-size: .8rem; margin-top: 28px; }}
-.ak-pie b {{ color: {TEAL}; }}
+.ak-pie b {{ color: var(--ak-p); }}
 .ak-landing {{
-    background: linear-gradient(135deg, {NAVY} 0%, #0F2A3D 60%, {TEAL} 140%); color: #E2E8F0;
+    background: linear-gradient(135deg, {NAVY} 0%, #0F2A3D 60%, var(--ak-p) 140%); color: #E2E8F0;
     border-radius: 24px; padding: 48px 36px; margin-top: 10px;
 }}
 .ak-landing h1 {{ color: #fff !important; font-size: 2.4rem; margin: 10px 0 6px; }}
@@ -291,8 +293,73 @@ def _html(contenido):
     st.markdown(contenido, unsafe_allow_html=True)
 
 
-def inyectar_estilos():
-    _html(_CSS)
+def _hex_a_rgb(h):
+    h = (h or "").lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def _rgb_a_hex(rgb):
+    return "#" + "".join(f"{max(0, min(255, round(c))):02X}" for c in rgb)
+
+
+def _mezclar(rgb, con, t):
+    """Mezcla el color con otro (t=0 -> igual, t=1 -> el otro)."""
+    return tuple(a + (b - a) * t for a, b in zip(rgb, con))
+
+
+def _luminancia(rgb):
+    def canal(c):
+        c = c / 255
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    r, g, b = (canal(c) for c in rgb)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def color_valido(h):
+    try:
+        _hex_a_rgb(h)
+        return len((h or "").lstrip("#")) in (3, 6)
+    except ValueError:
+        return False
+
+
+def _brillante(rgb):
+    """Version clara del color que se lea bien sobre el menu lateral oscuro."""
+    t = 0.35
+    while _luminancia(_mezclar(rgb, (255, 255, 255), t)) < 0.5 and t < 0.9:
+        t += 0.05
+    return _mezclar(rgb, (255, 255, 255), t)
+
+
+def paleta(color):
+    """A partir del color de marca de la clinica calcula todos los tonos que
+    usa el diseno (claro, borde, oscuro, brillante para el menu oscuro...) y
+    el color de texto que mejor se lee encima (blanco o casi negro)."""
+    if not color_valido(color):
+        color = COLOR_PREDETERMINADO
+    rgb = _hex_a_rgb(color)
+    blanco, negro = (255, 255, 255), (0, 0, 0)
+    texto = "#FFFFFF" if _luminancia(rgb) < 0.45 else "#0F172A"
+    r, g, b = rgb
+    return {
+        "p": _rgb_a_hex(rgb),
+        "oscuro": _rgb_a_hex(_mezclar(rgb, negro, 0.22)),
+        "medio": _rgb_a_hex(_mezclar(rgb, blanco, 0.25)),
+        "claro": _rgb_a_hex(_mezclar(rgb, blanco, 0.93)),
+        "borde": _rgb_a_hex(_mezclar(rgb, blanco, 0.6)),
+        "brillante": _rgb_a_hex(_brillante(rgb)),
+        "anillo": f"rgba({r},{g},{b},.18)",
+        "sombra": f"rgba({r},{g},{b},.45)",
+        "texto": texto,
+    }
+
+
+def inyectar_estilos(color=None):
+    t = paleta(color)
+    variables = "".join(f"--ak-{'p' if k == 'p' else 'p-' + k}: {v};" for k, v in t.items())
+    _html(f"<style>:root {{ {variables} }}</style>" + _CSS)
 
 
 def barra_plataforma(es_demo):

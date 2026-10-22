@@ -158,7 +158,11 @@ if negocio and negocio.get("logo_base64"):
 
 st.set_page_config(page_title=negocio["nombre"] if negocio else "Aika Solutions",
                    page_icon=_icono_pagina, layout="wide")
-ui.inyectar_estilos()
+# Color de marca de la clinica (o el de Aika si no ha elegido uno)
+COLOR_MARCA = ui.paleta((negocio or {}).get("color_marca"))["p"]
+ui.inyectar_estilos(COLOR_MARCA)
+AZUL_FUERTE = COLOR_MARCA
+COLOR_ESTADO = {**ui.COLOR_ESTADO, "Completada": COLOR_MARCA}
 
 # La barra oscura de "DEMO · Powered by Aika Solutions" solo sale en la demo
 # que se ensena a clientes potenciales; los negocios que pagan no la ven.
@@ -924,6 +928,47 @@ elif pagina == "Configuración":
     if negocio.get("logo_base64") and lc2.button("Quitar logo"):
         db.set_logo(None)
         st.success("Logo quitado.")
+        st.rerun()
+
+    st.divider()
+
+    st.subheader("Color de la marca")
+    st.caption("Es el color de botones, tarjetas seleccionadas, pasos y gráficas, para tu panel y la página "
+               "de tus " + V["clientes"] + ". Elige uno que combine con tu logo.")
+    COLORES_SUGERIDOS = {
+        "Verde azulado": "#0F766E", "Azul": "#1D4ED8", "Azul marino": "#1E3A8A", "Morado": "#7C3AED",
+        "Rosa": "#DB2777", "Rojo": "#DC2626", "Naranja": "#EA580C", "Dorado": "#B45309",
+        "Verde": "#15803D", "Negro": "#111827",
+    }
+    if "color_elegido" not in st.session_state:
+        st.session_state.color_elegido = COLOR_MARCA
+    sugeridos = st.columns(5)
+    for i, (nombre_color, hex_color) in enumerate(COLORES_SUGERIDOS.items()):
+        sugeridos[i % 5].button(
+            nombre_color, key=f"color_{hex_color}", use_container_width=True,
+            on_click=lambda h=hex_color: st.session_state.update(color_elegido=h))
+    cc1, cc2 = st.columns([1, 2])
+    with cc1:
+        color_elegido = st.color_picker("O elige cualquier color", key="color_elegido")
+    with cc2:
+        vista = ui.paleta(color_elegido)
+        st.markdown(
+            f'<div style="margin-top:28px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+            f'<span style="background:{vista["p"]};color:{vista["texto"]};padding:8px 16px;border-radius:12px;'
+            f'font-weight:700">Confirmar cita</span>'
+            f'<span style="background:{vista["claro"]};border:1.5px solid {vista["p"]};padding:8px 16px;'
+            f'border-radius:12px;font-weight:600">Tarjeta seleccionada</span>'
+            f'<span style="background:{vista["p"]};color:{vista["texto"]};width:26px;height:26px;'
+            f'border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-weight:800">1</span>'
+            f'</div>', unsafe_allow_html=True)
+    gc1, gc2 = st.columns(2)
+    if gc1.button("Guardar color", type="primary", use_container_width=True):
+        db.set_color(color_elegido)
+        st.success("Color guardado.")
+        st.rerun()
+    if negocio.get("color_marca") and gc2.button("Volver al color original", use_container_width=True):
+        db.set_color(None)
+        st.session_state.pop("color_elegido", None)
         st.rerun()
 
     st.divider()
