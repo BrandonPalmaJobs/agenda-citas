@@ -414,8 +414,16 @@ def pagina_reservar_publica():
         col_fecha, col_hora = st.columns([1, 2], gap="large")
         with col_fecha:
             ui.paso(3, "Fecha de la cita")
+            # Si hoy ya cerro (o no se abre), arrancar en el siguiente dia habil
+            fecha_inicial = hoy_negocio()
+            if ahora_negocio().strftime("%H:%M") >= negocio["hora_cierre"]:
+                fecha_inicial += timedelta(days=1)
+            for _ in range(7):
+                if db.DIAS_SEMANA[fecha_inicial.weekday()] in dias_laborales:
+                    break
+                fecha_inicial += timedelta(days=1)
             fecha_sel = st.date_input(
-                "Fecha", value=hoy_negocio(), min_value=hoy_negocio(), key="fecha_reserva_publica",
+                "Fecha", value=fecha_inicial, min_value=hoy_negocio(), key="fecha_reserva_publica",
                 label_visibility="collapsed", format="DD/MM/YYYY")
             st.caption(fecha_legible(fecha_sel).capitalize())
 
