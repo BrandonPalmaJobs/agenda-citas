@@ -34,7 +34,7 @@ jobs:
           for i in $(seq 1 60); do curl -s localhost:8501/_stcore/health && break; sleep 1; done
       - name: Probar en tamano celular
         run: |
-          python - <<'PY'
+          python - <<'PY' 2>&1 | tee resultado.txt
           import re
           from playwright.sync_api import sync_playwright
           with sync_playwright() as p:
@@ -47,6 +47,8 @@ jobs:
               pg.get_by_role("button", name="Entrar").click()
               pg.wait_for_timeout(5000)
               pg.screenshot(path="1_panel.png")
+              open("encabezado.html", "w").write(pg.evaluate(
+                  "() => (document.querySelector('[data-testid=\"stHeader\"]') || {outerHTML: 'sin header'}).outerHTML"))
               def estado():
                   return pg.evaluate("""() => {
                     const sb = document.querySelector('[data-testid="stSidebar"]');
@@ -79,7 +81,7 @@ jobs:
       - name: Guardar capturas en la rama "capturas"
         if: always()
         run: |
-          mkdir salida && mv *.png salida/ 2>/dev/null; cd salida
+          mkdir salida && mv *.png encabezado.html resultado.txt salida/ 2>/dev/null; cd salida
           git init -q && git checkout -q -b capturas
           git config user.name "capturas-bot" && git config user.email "capturas-bot@users.noreply.github.com"
           git add . && git commit -q -m "Prueba celular $(date -u +%F_%H%M)"
