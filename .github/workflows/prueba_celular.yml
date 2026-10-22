@@ -52,7 +52,9 @@ jobs:
               def estado():
                   return pg.evaluate("""() => {
                     const sb = document.querySelector('[data-testid="stSidebar"]');
-                    return sb ? sb.getAttribute('aria-expanded') : 'sin sidebar';
+                    if (!sb) return 'sin menu';
+                    const r = sb.getBoundingClientRect();
+                    return (r.right > 5 && r.width > 50) ? 'ABIERTO' : 'cerrado';
                   }""")
               print("Menu al entrar (aria-expanded):", estado())
               print("Botones del menu (testid, visible, dentro de stToolbar):", pg.evaluate("""() =>
@@ -61,7 +63,7 @@ jobs:
                   .map(e => [e.dataset.testid, e.offsetParent !== null, !!e.closest('[data-testid="stToolbar"]')])"""))
               print("Fork visible:", pg.evaluate("""() => [...document.querySelectorAll('*')]
                   .some(e => e.children.length === 0 && /^\\s*Fork\\s*$/.test(e.textContent) && e.offsetParent !== null)"""))
-              if estado() != "true":
+              if estado() != "ABIERTO":
                   for sel in ['[data-testid="stExpandSidebarButton"]', '[data-testid="stSidebarCollapsedControl"] button',
                               '[data-testid="stExpandSidebarButton"] button']:
                       if pg.locator(sel).count():
@@ -69,7 +71,7 @@ jobs:
                   pg.wait_for_timeout(1500)
               print("Menu abierto (aria-expanded):", estado())
               pg.screenshot(path="2_menu_abierto.png")
-              pg.locator('[data-testid="stSidebar"]').get_by_text(re.compile("Pacientes")).first.click()
+              pg.locator('[data-testid="stSidebar"] [data-testid="stRadioOption"]', has_text="Pacientes").first.click()
               pg.wait_for_timeout(5000)
               print("Tras elegir 'Pacientes' (aria-expanded):", estado())
               pg.screenshot(path="3_tras_elegir.png")

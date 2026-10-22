@@ -203,6 +203,7 @@ h1 {{ font-weight: 800 !important; }}
 [data-testid="stSidebar"] [data-testid="stExpander"] details {{
     background: rgba(255,255,255,.05) !important; border: 1px solid rgba(255,255,255,.16) !important; border-radius: 12px;
 }}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary {{ background: transparent !important; }}
 [data-testid="stSidebar"] [data-testid="stExpander"] summary,
 [data-testid="stSidebar"] [data-testid="stExpander"] summary * {{ color: #FFFFFF !important; font-weight: 700; }}
 [data-testid="stSidebar"] [data-testid="stExpander"] summary:hover {{ background: rgba(255,255,255,.06); }}
