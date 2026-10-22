@@ -1,0 +1,55 @@
+# Toma capturas de pantalla de la app (computadora y celular) para revisarla
+# sin tener que abrirla. Se corre a mano: Actions > "Capturas de la app" > Run workflow.
+name: Capturas de la app
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Pagina a capturar"
+        default: "https://clinicadentalaikasolutions.streamlit.app/?negocio=demo"
+
+jobs:
+  capturar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          pip install -q playwright
+          python -m playwright install --with-deps chromium > /dev/null
+      - name: Capturar
+        env:
+          URL: ${{ inputs.url }}
+        run: |
+          python - <<'PY'
+          import os, re
+          from playwright.sync_api import sync_playwright
+          url = os.environ["URL"]
+          with sync_playwright() as p:
+              b = p.chromium.launch()
+              for nombre, vista in [("computadora", {"width": 1280, "height": 900}),
+                                    ("celular", {"width": 390, "height": 844})]:
+                  ctx = b.new_context(viewport=vista, device_scale_factor=1, is_mobile=nombre == "celular")
+                  pg = ctx.new_page()
+                  pg.goto(url, wait_until="domcontentloaded", timeout=90000)
+                  pg.wait_for_timeout(6000)
+                  boton = pg.get_by_role("button", name=re.compile("get this app back up", re.I))
+                  if boton.count():
+                      boton.first.click(); pg.wait_for_timeout(60000)
+                  pg.wait_for_timeout(12000)
+                  marco = pg.frame_locator("iframe").first
+                  pg.screenshot(path=f"{nombre}.png", full_page=True)
+                  try:
+                      marco.locator("[data-testid=stMain]").screenshot(path=f"{nombre}_app.png")
+                  except Exception as e:
+                      print("sin captura interna:", e)
+                  ctx.close()
+              b.close()
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: capturas
+          path: "*.png"
