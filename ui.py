@@ -192,7 +192,32 @@ h1 {{ font-weight: 800 !important; }}
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] {{
     background: rgba(255,255,255,.06) !important; border-color: rgba(255,255,255,.12) !important; color: #E2E8F0 !important;
 }}
-[data-testid="stSidebar"] [data-testid="stExpander"] details {{ border-color: rgba(255,255,255,.12); }}
+[data-testid="stSidebar"] [data-testid="stExpander"] details {{
+    background: rgba(255,255,255,.05) !important; border: 1px solid rgba(255,255,255,.16) !important; border-radius: 12px;
+}}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary,
+[data-testid="stSidebar"] [data-testid="stExpander"] summary * {{ color: #FFFFFF !important; font-weight: 700; }}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover {{ background: rgba(255,255,255,.06); }}
+/* Cuadro del link para pacientes: fondo oscuro, texto verde brillante */
+[data-testid="stSidebar"] [data-testid="stCode"],
+[data-testid="stSidebar"] [data-testid="stCode"] > div,
+[data-testid="stSidebar"] [data-testid="stCode"] pre {{
+    background: #020617 !important; border-radius: 10px !important;
+}}
+[data-testid="stSidebar"] [data-testid="stCode"] pre {{
+    border: 1.5px solid {TEAL_MEDIO} !important; padding: 12px 44px 12px 12px !important;
+}}
+[data-testid="stSidebar"] [data-testid="stCode"] code,
+[data-testid="stSidebar"] [data-testid="stCode"] code * {{
+    color: #5EEAD4 !important; background: transparent !important; font-weight: 600;
+    white-space: pre-wrap !important; word-break: break-all !important; font-size: .82rem !important;
+}}
+[data-testid="stSidebar"] [data-testid="stCode"] button {{
+    opacity: 1 !important; visibility: visible !important; background: {TEAL_MEDIO} !important;
+    border: none !important; border-radius: 8px !important; color: #04201D !important;
+}}
+[data-testid="stSidebar"] [data-testid="stCode"] button * {{ color: #04201D !important; fill: #04201D !important; }}
+[data-testid="stSidebar"] .ak-link-ayuda {{ color: #CBD5E1 !important; font-size: .82rem; margin: 2px 0 8px; }}
 
 /* Componentes propios (HTML) */
 .ak-barra {{

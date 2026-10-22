@@ -610,8 +610,9 @@ if st.session_state.rol == "dueño":
 pagina = st.sidebar.radio("Menú", paginas, format_func=lambda p: f"{ICONOS_MENU.get(p, '')}  {p}",
                           label_visibility="collapsed")
 st.sidebar.divider()
-with st.sidebar.expander(f"Link para que agenden los {V['clientes']}"):
-    st.caption(f"Compártelo por WhatsApp o redes. Copia con el botón de la derecha.")
+with st.sidebar.expander(f"🔗 Link para que agenden los {V['clientes']}", expanded=True):
+    st.markdown('<div class="ak-link-ayuda">Compártelo por WhatsApp o redes. '
+                'Cópialo con el botón verde de la derecha.</div>', unsafe_allow_html=True)
     st.code(link_publico(), language=None)
 if st.sidebar.button("Cerrar sesión", use_container_width=True):
     st.session_state.staff_autenticado = False
