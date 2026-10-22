@@ -228,6 +228,13 @@ h1 {{ font-weight: 800 !important; }}
     display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; font-size: .85rem;
 }}
 .ak-barra b {{ color: #fff; }}
+/* Ciclo de 11 min: visible el primer minuto (0-9%), oculta los otros 10 */
+.ak-barra-ciclo {{ overflow: hidden; animation: ak-ciclo-barra 660s linear infinite; }}
+@keyframes ak-ciclo-barra {{
+  0%, 8.6% {{ max-height: 140px; opacity: 1; margin-bottom: 14px; padding-top: 10px; padding-bottom: 10px; }}
+  9.1%, 99.4% {{ max-height: 0; opacity: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; }}
+  100% {{ max-height: 140px; opacity: 1; margin-bottom: 14px; padding-top: 10px; padding-bottom: 10px; }}
+}}
 .ak-pill {{
     display: inline-block; background: rgba(20,184,166,.18); color: #5EEAD4; border: 1px solid rgba(94,234,212,.35);
     border-radius: 999px; padding: 2px 10px; font-weight: 800; font-size: .72rem; letter-spacing: .06em; margin-right: 8px;
@@ -363,7 +370,11 @@ def inyectar_estilos(color=None):
     _html(f"<style>:root {{ {variables} }}</style>" + _CSS)
 
 
-def barra_plataforma(es_demo, admin=False):
+# La barra "DEMO" del panel aparece 1 minuto y se oculta 10, en ciclo.
+CICLO_BARRA_SEG = 11 * 60
+
+
+def barra_plataforma(es_demo, admin=False, intermitente=False):
     if admin:
         _html(
             '<div class="ak-barra"><div><span class="ak-pill">ADMIN</span>'
@@ -371,8 +382,16 @@ def barra_plataforma(es_demo, admin=False):
             '<div class="ak-plan">Acceso <b>privado</b></div></div>'
         )
     elif es_demo:
+        estilo = ""
+        clase = "ak-barra"
+        if intermitente:
+            import time
+            # retraso negativo = en que punto del ciclo vamos segun el reloj; asi
+            # no se reinicia cada vez que se cambia de pantalla en el panel
+            clase += " ak-barra-ciclo"
+            estilo = f' style="animation-delay:-{int(time.time()) % CICLO_BARRA_SEG}s"'
         _html(
-            '<div class="ak-barra"><div><span class="ak-pill">DEMO</span>'
+            f'<div class="{clase}"{estilo}><div><span class="ak-pill">DEMO</span>'
             'Plataforma de agenda para clínicas y consultorios · Powered by <b>Aika Solutions</b></div>'
             '<div class="ak-plan">Plan activo: <b>Demo Enterprise</b></div></div>'
         )

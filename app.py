@@ -660,7 +660,7 @@ if SUSCRIPCION["bloqueado"]:
     st.stop()
 
 if not st.session_state.staff_autenticado:
-    ui.barra_plataforma(ES_DEMO)
+    ui.barra_plataforma(ES_DEMO, intermitente=True)
     ui.encabezado_negocio(negocio, "Panel privado del negocio", V["icono"])
     _izq, centro, _der = st.columns([1, 2, 1])
     with centro, st.container(key="card_principal"):
@@ -710,7 +710,7 @@ if st.sidebar.button("Cerrar sesión", use_container_width=True):
     st.rerun()
 st.sidebar.caption("Powered by Aika Solutions")
 
-ui.barra_plataforma(ES_DEMO)
+ui.barra_plataforma(ES_DEMO, intermitente=True)
 if SUSCRIPCION["aviso"]:
     contacto = _contacto_aika()
     st.warning(SUSCRIPCION["aviso"] + (f" ({contacto})" if contacto else ""))
