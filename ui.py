@@ -155,13 +155,12 @@ h1 {{ font-weight: 800 !important; }}
 .st-key-tarjetas_especialista [data-testid="stRadioCaption"] p {{ color: {TEXTO_SUAVE}; font-size: .8rem; }}
 
 /* Horarios en "pastillas" */
-.st-key-horarios [data-testid="stHorizontalBlock"] {{ flex-wrap: wrap; gap: 10px; }}
-.st-key-horarios [data-testid="stColumn"] {{
-    flex: 1 1 calc(33.33% - 10px) !important; min-width: calc(33.33% - 10px) !important;
-}}
-@media (min-width: 900px) {{
+.st-key-horarios [data-testid="stVerticalBlock"] {{ gap: 10px; }}
+.st-key-horarios [data-testid="stHorizontalBlock"] {{ gap: 10px; }}
+@media (max-width: 640px) {{
+  .st-key-horarios [data-testid="stHorizontalBlock"] {{ flex-wrap: wrap; }}
   .st-key-horarios [data-testid="stColumn"] {{
-      flex: 1 1 calc(16.66% - 10px) !important; min-width: calc(16.66% - 10px) !important;
+      flex: 1 1 calc(33.33% - 10px) !important; min-width: calc(33.33% - 10px) !important;
   }}
 }}
 .st-key-horarios button {{ border-radius: 999px !important; padding: .35rem .5rem !important; font-weight: 700 !important; }}

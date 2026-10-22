@@ -260,14 +260,13 @@ def mostrar_logo(negocio, ancho=140):
             pass
 
 
-def selector_horarios(horarios, key_prefix):
+def selector_horarios(horarios, key_prefix, por_fila=6):
     """Cuadritos de horas para elegir, en vez de un dropdown - solo muestra
     las horas que de verdad estan disponibles. Regresa la hora elegida."""
     key_sel = f"{key_prefix}_hora_sel"
     if st.session_state.get(key_sel) not in horarios:
         st.session_state[key_sel] = horarios[0] if horarios else None
 
-    por_fila = 6
     for i in range(0, len(horarios), por_fila):
         fila = horarios[i:i + por_fila]
         cols = st.columns(por_fila)
@@ -440,7 +439,7 @@ def pagina_reservar_publica():
                     st.info("Ya no quedan horarios libres ese día con esta opción. Prueba otra fecha o especialista.")
                 else:
                     with st.container(key="horarios"):
-                        hora_sel = selector_horarios(disponibles, key_prefix="pub")
+                        hora_sel = selector_horarios(disponibles, key_prefix="pub", por_fila=4)
 
         if hora_sel is None:
             ui.pie()
