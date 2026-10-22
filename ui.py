@@ -66,10 +66,10 @@ html, body, [data-testid="stApp"], [data-testid="stApp"] * {{
 [data-testid="stHeader"] {{ background: transparent; height: 0; }}
 [data-testid="stToolbarActions"], [data-testid="stMainMenu"] {{ display: none !important; }}
 /* Toda la barra de herramientas de Streamlit (Fork, GitHub, Share, Deploy, menu...),
-   tambien la que ve el dueno de la cuenta de Streamlit. Los botones para abrir/cerrar
-   el menu lateral NO estan aqui dentro, asi que siguen funcionando. */
-[data-testid="stToolbar"], [data-testid="stAppDeployButton"], .stAppDeployButton,
-[data-testid="stStatusWidget"] {{ display: none !important; }}
+   tambien la que ve el dueno de la cuenta de Streamlit - EXCEPTO el boton para abrir
+   el menu lateral (stExpandSidebarButton), que vive dentro de esa misma barra. */
+[data-testid="stToolbar"] *:not([data-testid="stExpandSidebarButton"]):not([data-testid="stExpandSidebarButton"] *):not(:has([data-testid="stExpandSidebarButton"])),
+[data-testid="stAppDeployButton"], .stAppDeployButton, [data-testid="stStatusWidget"] {{ display: none !important; }}
 [data-testid="stHeaderActionElements"] {{ display: none !important; }}
 footer {{ visibility: hidden; }}
 
