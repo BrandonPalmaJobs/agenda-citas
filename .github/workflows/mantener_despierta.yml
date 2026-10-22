@@ -1,47 +1,82 @@
-# Abre la app cada 6 horas con un navegador real (como si fuera un visitante)
-# para que Streamlit Community Cloud no la duerma por inactividad. Si la
+# Abre la app CADA HORA con un navegador real (como si fuera un visitante)
+# para que Streamlit Community Cloud nunca la duerma por inactividad. Si la
 # encuentra dormida, le da clic a "Yes, get this app back up!".
-# Corre gratis en GitHub Actions. Para correrlo a mano: pestana "Actions" del
-# repo > "Mantener la app despierta" > "Run workflow".
+#
+# Ademas evita que GitHub pause esta tarea: GitHub apaga las tareas
+# programadas de repos publicos que pasan 60 dias sin actividad, asi que
+# cada ~30 dias se manda un commit vacio a la rama "keepalive" (no a main,
+# para no reiniciar la app).
+#
+# Para correrlo a mano: pestana "Actions" del repo > "Mantener la app despierta" > "Run workflow".
 name: Mantener la app despierta
 
 on:
   schedule:
-    - cron: "17 */6 * * *"   # cada 6 horas (hora UTC)
+    - cron: "7 * * * *"   # cada hora, en el minuto 7
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   despertar:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      APP_URL: https://clinicadentalaikasolutions.streamlit.app/?negocio=demo
+      APP_URLS: >-
+        https://clinicadentalaikasolutions.streamlit.app/?negocio=demo
     steps:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Instalar navegador
         run: |
-          pip install playwright
-          python -m playwright install --with-deps chromium
+          pip install -q playwright
+          python -m playwright install --with-deps chromium > /dev/null
       - name: Visitar la app
         run: |
           python - <<'PY'
           import os, re
           from playwright.sync_api import sync_playwright
-          url = os.environ["APP_URL"]
           with sync_playwright() as p:
               navegador = p.chromium.launch()
-              pagina = navegador.new_page()
-              pagina.goto(url, wait_until="domcontentloaded", timeout=90000)
-              pagina.wait_for_timeout(8000)
-              boton = pagina.get_by_role("button", name=re.compile("get this app back up", re.I))
-              if boton.count():
-                  print("La app estaba dormida: despertandola...")
-                  boton.first.click()
-                  pagina.wait_for_timeout(90000)
-              else:
-                  print("La app ya estaba despierta.")
-                  pagina.wait_for_timeout(20000)
+              for url in os.environ["APP_URLS"].split():
+                  pagina = navegador.new_page()
+                  pagina.goto(url, wait_until="domcontentloaded", timeout=90000)
+                  pagina.wait_for_timeout(8000)
+                  boton = pagina.get_by_role("button", name=re.compile("get this app back up", re.I))
+                  if boton.count():
+                      print(f"{url}: estaba dormida, despertandola...")
+                      boton.first.click()
+                      pagina.wait_for_timeout(90000)
+                  else:
+                      print(f"{url}: despierta.")
+                      pagina.wait_for_timeout(15000)
+                  pagina.close()
               navegador.close()
           PY
+
+  no_pausar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+      - name: Commit vacio a "keepalive" si hace falta
+        run: |
+          git config user.name "keepalive-bot"
+          git config user.email "keepalive-bot@users.noreply.github.com"
+          ultimo=$(git ls-remote origin refs/heads/keepalive | cut -f1)
+          if [ -n "$ultimo" ]; then
+            git fetch -q --depth=1 origin keepalive
+            edad=$(( ( $(date +%s) - $(git log -1 --format=%ct FETCH_HEAD) ) / 86400 ))
+          else
+            edad=999
+          fi
+          echo "Dias desde el ultimo keepalive: $edad"
+          if [ "$edad" -ge 30 ]; then
+            git commit --allow-empty -q -m "keepalive: mantener activas las tareas programadas"
+            git push -q -f origin HEAD:refs/heads/keepalive
+            echo "Listo, actividad registrada."
+          fi
