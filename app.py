@@ -30,16 +30,17 @@ import streamlit as st
 
 import db
 import google_calendar
+import ui
 
 # Paleta de las graficas de Estadisticas: azul fuerte / gris claro / blanco.
 # Cancelada y No asistio quedan en tonos muy claros a proposito (pedido del
 # negocio) - por eso todas las marcas llevan un contorno gris (CONTORNO) para
 # que sigan siendo visibles sobre el fondo blanco.
-AZUL_FUERTE = "#1c5cab"
-GRIS_CLARO = "#d8d7d1"
+AZUL_FUERTE = ui.TEAL
+GRIS_CLARO = "#CBD5E1"
 BLANCO = "#ffffff"
-CONTORNO = "#a9a89f"
-COLOR_ESTADO = {"Completada": AZUL_FUERTE, "Cancelada": GRIS_CLARO, "No asistio": BLANCO}
+CONTORNO = "#ffffff"
+COLOR_ESTADO = ui.COLOR_ESTADO
 
 DIAS_NOMBRE = {
     "Lun": "lunes", "Mar": "martes", "Mie": "miércoles", "Jue": "jueves",
@@ -110,18 +111,27 @@ VOCABULARIO = {
         "icono": "🦷", "icono_personal": "🧑‍⚕️", "con_quien": "¿Con qué doctor(a)?",
         "personal_desc": "Dentistas, higienistas y asistentes - quién atiende las citas.",
         "ejemplos_servicios": "Ej. 'Valoración' (30 min), 'Limpieza dental' (45 min), 'Resina' (60 min).",
+        "subtitulo": "Odontología integral · Agenda en línea", "titulo_reserva": "Agenda tu cita dental",
+        "paso_servicio": "Selecciona el tratamiento", "paso_especialista": "Elige a tu odontólogo(a)",
+        "especialistas": "Odontólogos activos",
     },
     "Consultorio medico": {
         "cliente": "paciente", "clientes": "pacientes", "Cliente": "Paciente", "Clientes": "Pacientes",
         "icono": "🩺", "icono_personal": "🧑‍⚕️", "con_quien": "¿Con qué doctor(a)?",
         "personal_desc": "Doctores, enfermeras y asistentes - quién atiende las citas.",
         "ejemplos_servicios": "Ej. 'Consulta general' (30 min), 'Revisión de estudios' (20 min).",
+        "subtitulo": "Consultorio médico · Agenda en línea", "titulo_reserva": "Agenda tu consulta",
+        "paso_servicio": "Selecciona el tipo de consulta", "paso_especialista": "Elige a tu doctor(a)",
+        "especialistas": "Doctores activos",
     },
     "Barberia": {
         "cliente": "cliente", "clientes": "clientes", "Cliente": "Cliente", "Clientes": "Clientes",
         "icono": "💈", "icono_personal": "💈", "con_quien": "¿Con quién?",
         "personal_desc": "Barberos y estilistas - quién atiende las citas.",
         "ejemplos_servicios": "Ej. 'Corte de cabello' (30 min), 'Corte y barba' (60 min).",
+        "subtitulo": "Barbería · Agenda en línea", "titulo_reserva": "Agenda tu cita",
+        "paso_servicio": "Selecciona el servicio", "paso_especialista": "Elige a tu barbero",
+        "especialistas": "Barberos activos",
     },
 }
 VOCABULARIO_GENERICO = {
@@ -129,6 +139,9 @@ VOCABULARIO_GENERICO = {
     "icono": "📅", "icono_personal": "👤", "con_quien": "¿Con quién?",
     "personal_desc": "Las personas que atienden las citas.",
     "ejemplos_servicios": "Ej. 'Consulta' (30 min), 'Sesión' (60 min).",
+    "subtitulo": "Agenda en línea", "titulo_reserva": "Agenda tu cita",
+    "paso_servicio": "Selecciona el servicio", "paso_especialista": "¿Con quién?",
+    "especialistas": "Personal activo",
 }
 V = VOCABULARIO.get((negocio or {}).get("tipo"), VOCABULARIO_GENERICO)
 
@@ -145,18 +158,18 @@ if negocio and negocio.get("logo_base64"):
 
 st.set_page_config(page_title=negocio["nombre"] if negocio else "Aika Solutions",
                    page_icon=_icono_pagina, layout="wide")
+ui.inyectar_estilos()
+
+# La barra oscura de "DEMO · Powered by Aika Solutions" solo sale en la demo
+# que se ensena a clientes potenciales; los negocios que pagan no la ven.
+ES_DEMO = NEGOCIO_SLUG == "demo"
 
 if _negocio_no_configurado:
     st.error(f"No encontramos configuración para el negocio '{NEGOCIO_SLUG}'. Revisa el link.")
     st.stop()
 
 if _es_raiz_de_plataforma:
-    st.title("Aika Solutions")
-    st.subheader("Agenda de citas en línea para consultorios y negocios de servicio")
-    st.write(
-        "Si te compartieron el link de tu clínica o negocio para agendar, revisa que "
-        "este completo: debe terminar en algo como `?negocio=nombre-del-negocio`."
-    )
+    ui.portada_plataforma()
     st.stop()
 
 
@@ -303,154 +316,231 @@ def _avisar_calendar(cita_id, cliente, servicio_nombre, proveedor_nombre, fecha_
     return error
 
 
+MESES_NOMBRE = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+                "septiembre", "octubre", "noviembre", "diciembre"]
+
+
+def fecha_legible(f):
+    return f"{DIAS_NOMBRE[db.DIAS_SEMANA[f.weekday()]]} {f.day} de {MESES_NOMBRE[f.month]}"
+
+
+def icono_servicio(nombre):
+    """Un icono que acompane a cada servicio en su tarjeta, segun palabras
+    clave del nombre (si no reconoce nada, usa el icono del giro)."""
+    n = (nombre or "").lower()
+    reglas = [
+        (("limpieza", "profilaxis"), "🪥"), (("blanque",), "✨"), (("brackets", "ortodon"), "😁"),
+        (("endodon", "conducto"), "🦷"), (("extrac", "cirug", "muela"), "🦷"), (("resina", "curaci"), "🦷"),
+        (("carilla", "sonrisa", "estetic", "estétic"), "💎"), (("implante",), "🔩"),
+        (("valoraci", "diagn", "consulta", "revisi"), "🩺"), (("barba",), "🧔"), (("corte",), "✂️"),
+        (("ceja",), "👁️"), (("niño", "nino", "infantil"), "🧒"),
+    ]
+    for claves, icono in reglas:
+        if any(c in n for c in claves):
+            return icono
+    return V["icono"]
+
+
+def avatar_persona(nombre):
+    n = (nombre or "").lower()
+    if n.startswith("dra"):
+        return "👩‍⚕️"
+    if n.startswith("dr"):
+        return "👨‍⚕️"
+    return V["icono_personal"]
+
+
+def precio_texto(precio):
+    return f"${precio:,.0f}" if precio else ""
+
+
 # ---------------------------------------------------------------- Vista publica: cliente se autoagenda
 def pagina_reservar_publica():
-    mostrar_logo(negocio)
-    st.title(f"{V['icono']} Reservar cita - {negocio['nombre']}")
-    st.caption(negocio["tipo"])
+    ui.barra_plataforma(ES_DEMO)
+    ui.encabezado_negocio(negocio, V["subtitulo"], V["icono"])
 
     servicios = db.list_servicios(solo_activos=True)
     proveedores = db.list_proveedores(solo_activos=True)
 
     if not servicios or not proveedores:
         st.info("Este negocio todavía no tiene la agenda configurada. Intenta más tarde.")
+        ui.pie()
         return
 
-    servicio_id = st.selectbox(
-        "Servicio", options=[s["id"] for s in servicios],
-        format_func=lambda sid: next(f"{s['nombre']} ({s['duracion_min']} min)" for s in servicios if s["id"] == sid))
-    duracion = next(s["duracion_min"] for s in servicios if s["id"] == servicio_id)
+    with st.container(key="card_principal"):
+        ui.titulo_seccion("RESERVA EN LÍNEA", V["titulo_reserva"],
+                          "Elige el servicio, con quién y el horario que más te convenga. Solo verás horarios realmente libres.")
 
-    opciones_prov = {0: "Cualquiera disponible"} | {p["id"]: p["nombre"] for p in proveedores}
-    proveedor_sel = st.selectbox(V["con_quien"], options=list(opciones_prov.keys()),
-                                  format_func=lambda pid: opciones_prov[pid])
+        # ---- 1. Servicio (tarjetas)
+        ui.paso(1, V["paso_servicio"])
+        serv_por_id = {s["id"]: s for s in servicios}
+        with st.container(key="tarjetas_servicio"):
+            servicio_id = st.radio(
+                "Servicio", options=list(serv_por_id.keys()), key="pub_servicio", label_visibility="collapsed",
+                format_func=lambda sid: f"{icono_servicio(serv_por_id[sid]['nombre'])}  **{serv_por_id[sid]['nombre']}**",
+                captions=[
+                    " · ".join(x for x in [f"{s['duracion_min']} min", precio_texto(s["precio"])] if x)
+                    for s in servicios
+                ],
+            )
+        duracion = serv_por_id[servicio_id]["duracion_min"]
 
-    dias_laborales = negocio["dias_laborales"].split(",")
-    fecha_sel = st.date_input(
-        "Fecha", value=hoy_negocio(), min_value=hoy_negocio(), key="fecha_reserva_publica")
+        # ---- 2. Especialista (tarjetas)
+        ui.paso(2, V["paso_especialista"])
+        prov_por_id = {p["id"]: p for p in proveedores}
+        with st.container(key="tarjetas_especialista"):
+            proveedor_sel = st.radio(
+                "Especialista", options=[0] + list(prov_por_id.keys()), key="pub_proveedor",
+                label_visibility="collapsed",
+                format_func=lambda pid: "⚡  **Cualquiera disponible**" if pid == 0
+                else f"{avatar_persona(prov_por_id[pid]['nombre'])}  **{prov_por_id[pid]['nombre']}**",
+                captions=["El primer horario libre"] + [p["especialidad"] or " " for p in proveedores],
+            )
 
-    if db.DIAS_SEMANA[fecha_sel.weekday()] not in dias_laborales:
-        dias_abiertos = ", ".join(DIAS_NOMBRE.get(d, d) for d in dias_laborales)
-        siguiente = fecha_sel
-        for _ in range(14):
-            siguiente += timedelta(days=1)
-            if db.DIAS_SEMANA[siguiente.weekday()] in dias_laborales:
-                break
-        st.warning(
-            f"El {fecha_sel.strftime('%d/%m/%Y')} "
-            f"({DIAS_NOMBRE.get(db.DIAS_SEMANA[fecha_sel.weekday()], '')}) el negocio está cerrado. "
-            f"Atendemos: {dias_abiertos}."
-        )
-        st.button(
-            f"Usar el próximo día disponible ({siguiente.strftime('%d/%m/%Y')})",
-            on_click=lambda: st.session_state.update(fecha_reserva_publica=siguiente),
-        )
-        return
+        # ---- 3 y 4. Fecha + horarios
+        dias_laborales = negocio["dias_laborales"].split(",")
+        col_fecha, col_hora = st.columns([1, 2], gap="large")
+        with col_fecha:
+            ui.paso(3, "Fecha de la cita")
+            fecha_sel = st.date_input(
+                "Fecha", value=hoy_negocio(), min_value=hoy_negocio(), key="fecha_reserva_publica",
+                label_visibility="collapsed", format="DD/MM/YYYY")
+            st.caption(fecha_legible(fecha_sel).capitalize())
 
-    horarios_base = generar_horarios(negocio["hora_apertura"], negocio["hora_cierre"], negocio["intervalo_min"])
-    horarios_base = quitar_horas_pasadas(horarios_base, fecha_sel)
-    horarios_base = quitar_horas_descanso(
-        horarios_base, duracion, negocio.get("descanso_inicio"), negocio.get("descanso_fin"))
-
-    if proveedor_sel == 0:
-        disponibles = sorted(set().union(*[
-            db.horarios_disponibles(p["id"], fecha_sel.isoformat(), duracion, horarios_base) for p in proveedores
-        ]))
-    else:
-        disponibles = db.horarios_disponibles(proveedor_sel, fecha_sel.isoformat(), duracion, horarios_base)
-
-    if not disponibles:
-        st.warning("No hay horarios disponibles ese día para esa opción. Prueba otra fecha, servicio o proveedor.")
-        return
-
-    st.write("Hora disponible")
-    hora_sel = selector_horarios(disponibles, key_prefix="pub")
-
-    servicio_nombre = next(s["nombre"] for s in servicios if s["id"] == servicio_id)
-
-    def _confirmar(cliente, notas):
-        proveedor_final = _resolver_proveedor_final(proveedor_sel, proveedores, fecha_sel, duracion, hora_sel)
-        if proveedor_final is None:
-            st.error("Ese horario se acaba de ocupar, por favor elige otro.")
-            return
-        proveedor_nombre = next(p["nombre"] for p in proveedores if p["id"] == proveedor_final)
-        try:
-            cita_id = db.agendar_cita(cliente["id"], proveedor_final, servicio_id, fecha_sel.isoformat(),
-                                       hora_sel, duracion, notas.strip())
-        except ValueError:
-            st.error("Ese horario se acaba de ocupar, por favor elige otro.")
-            return
-        st.success(
-            f"Listo, {cliente['nombre']}. Tu cita quedó agendada para el "
-            f"{fecha_sel.strftime('%d/%m/%Y')} a las {hora_sel}."
-        )
-        error_calendar = _avisar_calendar(
-            cita_id, cliente, servicio_nombre, proveedor_nombre,
-            fecha_sel.isoformat(), hora_sel, duracion, notas)
-        if error_calendar:
-            st.caption(f"(La cita quedó guardada. No se pudo mandar la invitación de Google Calendar: {error_calendar})")
-
-    st.divider()
-    st.subheader("Tus datos")
-    modo = st.radio("¿Ya has agendado con nosotros antes?", [f"No, soy {V['cliente']} nuevo", f"Sí, ya soy {V['cliente']}"],
-                     horizontal=True)
-
-    if modo == f"Sí, ya soy {V['cliente']}":
-        # Solo coincidencia EXACTA de telefono o correo (nunca por nombre ni por
-        # pedazos): asi nadie puede escribir "a" y ver la lista de pacientes.
-        # Y lo unico que se muestra de quien se encontro es su nombre
-        # enmascarado - nunca telefonos ni correos.
-        busqueda = st.text_input("Escribe tu teléfono (10 dígitos) o el correo con el que te registraste")
-        cliente_sel = None
-        termino = busqueda.strip()
-        if termino:
-            if "@" not in termino and not telefono_valido(termino):
-                st.warning("Escribe tu teléfono completo (10 dígitos, solo números) o tu correo.")
-                encontrados = None
+        hora_sel = None
+        with col_hora:
+            ui.paso(4, "Horarios disponibles")
+            if db.DIAS_SEMANA[fecha_sel.weekday()] not in dias_laborales:
+                dias_abiertos = ", ".join(DIAS_NOMBRE.get(d, d) for d in dias_laborales)
+                siguiente = fecha_sel
+                for _ in range(14):
+                    siguiente += timedelta(days=1)
+                    if db.DIAS_SEMANA[siguiente.weekday()] in dias_laborales:
+                        break
+                st.warning(f"Ese día no abrimos. Atendemos: {dias_abiertos}.")
+                st.button(
+                    f"Ir al {fecha_legible(siguiente)}",
+                    on_click=lambda: st.session_state.update(fecha_reserva_publica=siguiente),
+                )
             else:
-                encontrados = db.buscar_cliente_exacto(termino)
-            if encontrados is None:
-                pass
-            elif not encontrados:
-                st.warning("No encontramos a nadie con ese dato. Revisa que esté bien escrito, "
-                           f"o elige '{V['Cliente']} nuevo' para registrarte.")
-            elif len(encontrados) == 1:
-                cliente_sel = encontrados[0]
-                st.success(f"Hola de nuevo, {enmascarar_nombre(cliente_sel['nombre'])}.")
-            else:
-                opciones = {c["id"]: enmascarar_nombre(c["nombre"]) for c in encontrados}
-                cid = st.selectbox("Hay varios registros con ese dato - ¿cuál eres?", options=list(opciones.keys()),
-                                    format_func=lambda cid: opciones[cid])
-                cliente_sel = next(c for c in encontrados if c["id"] == cid)
-
-        notas = st.text_area("Algo que debamos saber (opcional)", key="notas_reservar_existente")
-        if cliente_sel and st.button("Confirmar cita"):
-            _confirmar(cliente_sel, notas)
-    else:
-        with st.form("form_reservar_publico"):
-            c1, c2 = st.columns(2)
-            nombre = c1.text_input("Nombre completo")
-            telefono = c2.text_input("Teléfono")
-            email = st.text_input("Email (opcional - si lo dejas, te mandamos invitación y recordatorio)")
-            notas = st.text_area("Algo que debamos saber (opcional)")
-
-            if st.form_submit_button("Confirmar cita"):
-                if not nombre.strip() or not telefono.strip():
-                    st.error("Nombre y teléfono son obligatorios.")
-                elif not telefono_valido(telefono):
-                    st.error("El teléfono debe tener 10 dígitos (solo números, sin espacios ni guiones).")
+                horarios_base = generar_horarios(
+                    negocio["hora_apertura"], negocio["hora_cierre"], negocio["intervalo_min"])
+                horarios_base = quitar_horas_pasadas(horarios_base, fecha_sel)
+                horarios_base = quitar_horas_descanso(
+                    horarios_base, duracion, negocio.get("descanso_inicio"), negocio.get("descanso_fin"))
+                if proveedor_sel == 0:
+                    disponibles = sorted(set().union(*[
+                        db.horarios_disponibles(p["id"], fecha_sel.isoformat(), duracion, horarios_base)
+                        for p in proveedores
+                    ]))
                 else:
-                    # Si el telefono ya esta registrado no se agenda a nombre de
-                    # otra persona en silencio: se le pide que entre como
-                    # registrado (asi tampoco se revela de quien es ese numero).
-                    if db.find_cliente_por_telefono(telefono.strip()):
-                        st.warning(
-                            "Ese teléfono ya está registrado. Elige "
-                            f"'Sí, ya soy {V['cliente']}' arriba y búscate con tu teléfono.")
+                    disponibles = db.horarios_disponibles(
+                        proveedor_sel, fecha_sel.isoformat(), duracion, horarios_base)
+                if not disponibles:
+                    st.info("Ya no quedan horarios libres ese día con esta opción. Prueba otra fecha o especialista.")
+                else:
+                    with st.container(key="horarios"):
+                        hora_sel = selector_horarios(disponibles, key_prefix="pub")
+
+        if hora_sel is None:
+            ui.pie()
+            return
+
+        servicio_nombre = serv_por_id[servicio_id]["nombre"]
+        con_quien = "el primer especialista disponible" if proveedor_sel == 0 else prov_por_id[proveedor_sel]["nombre"]
+        st.success(
+            f"**{servicio_nombre}** con {con_quien} — {fecha_legible(fecha_sel)} a las **{hora_sel}**"
+        )
+
+        def _confirmar(cliente, notas):
+            proveedor_final = _resolver_proveedor_final(proveedor_sel, proveedores, fecha_sel, duracion, hora_sel)
+            if proveedor_final is None:
+                st.error("Ese horario se acaba de ocupar, por favor elige otro.")
+                return
+            proveedor_nombre = next(p["nombre"] for p in proveedores if p["id"] == proveedor_final)
+            try:
+                cita_id = db.agendar_cita(cliente["id"], proveedor_final, servicio_id, fecha_sel.isoformat(),
+                                           hora_sel, duracion, notas.strip())
+            except ValueError:
+                st.error("Ese horario se acaba de ocupar, por favor elige otro.")
+                return
+            st.success(
+                f"✅ Listo, {cliente['nombre']}. Tu cita quedó agendada para el "
+                f"{fecha_legible(fecha_sel)} a las {hora_sel} con {proveedor_nombre}."
+            )
+            error_calendar = _avisar_calendar(
+                cita_id, cliente, servicio_nombre, proveedor_nombre,
+                fecha_sel.isoformat(), hora_sel, duracion, notas)
+            if error_calendar:
+                st.caption(f"(La cita quedó guardada. No se pudo mandar la invitación de Google Calendar: {error_calendar})")
+
+
+        # ---- 5. Datos del paciente
+        ui.paso(5, "Tus datos")
+        with st.container(key="card_datos"):
+            modo = st.radio("¿Ya has agendado con nosotros antes?", [f"No, soy {V['cliente']} nuevo", f"Sí, ya soy {V['cliente']}"],
+                             horizontal=True)
+
+            if modo == f"Sí, ya soy {V['cliente']}":
+                # Solo coincidencia EXACTA de telefono o correo (nunca por nombre ni por
+                # pedazos): asi nadie puede escribir "a" y ver la lista de pacientes.
+                # Y lo unico que se muestra de quien se encontro es su nombre
+                # enmascarado - nunca telefonos ni correos.
+                busqueda = st.text_input("Escribe tu teléfono (10 dígitos) o el correo con el que te registraste")
+                cliente_sel = None
+                termino = busqueda.strip()
+                if termino:
+                    if "@" not in termino and not telefono_valido(termino):
+                        st.warning("Escribe tu teléfono completo (10 dígitos, solo números) o tu correo.")
+                        encontrados = None
                     else:
-                        cliente_id = db.add_cliente(nombre.strip(), telefono.strip(), email.strip(), "")
-                        cliente = {"id": cliente_id, "nombre": nombre.strip(), "email": email.strip()}
-                        _confirmar(cliente, notas)
+                        encontrados = db.buscar_cliente_exacto(termino)
+                    if encontrados is None:
+                        pass
+                    elif not encontrados:
+                        st.warning("No encontramos a nadie con ese dato. Revisa que esté bien escrito, "
+                                   f"o elige '{V['Cliente']} nuevo' para registrarte.")
+                    elif len(encontrados) == 1:
+                        cliente_sel = encontrados[0]
+                        st.success(f"Hola de nuevo, {enmascarar_nombre(cliente_sel['nombre'])}.")
+                    else:
+                        opciones = {c["id"]: enmascarar_nombre(c["nombre"]) for c in encontrados}
+                        cid = st.selectbox("Hay varios registros con ese dato - ¿cuál eres?", options=list(opciones.keys()),
+                                            format_func=lambda cid: opciones[cid])
+                        cliente_sel = next(c for c in encontrados if c["id"] == cid)
+
+                notas = st.text_input("Notas o síntomas (opcional)", key="notas_reservar_existente")
+                if cliente_sel and st.button("Confirmar cita", type="primary", use_container_width=True):
+                    _confirmar(cliente_sel, notas)
+            else:
+                with st.form("form_reservar_publico"):
+                    c1, c2 = st.columns(2)
+                    nombre = c1.text_input("Nombre completo *", placeholder="Ej. Ana María Gómez")
+                    telefono = c2.text_input("Teléfono (WhatsApp) *", placeholder="10 dígitos, ej. 5512345678")
+                    c3, c4 = st.columns(2)
+                    email = c3.text_input("Correo electrónico (opcional)", placeholder="tucorreo@ejemplo.com",
+                                          help="Si lo dejas, te mandamos la invitación y un recordatorio.")
+                    notas = c4.text_input("Notas o síntomas (opcional)", placeholder="Ej. dolor de muela, revisión")
+
+                    if st.form_submit_button("Confirmar cita", type="primary", use_container_width=True):
+                        if not nombre.strip() or not telefono.strip():
+                            st.error("Nombre y teléfono son obligatorios.")
+                        elif not telefono_valido(telefono):
+                            st.error("El teléfono debe tener 10 dígitos (solo números, sin espacios ni guiones).")
+                        else:
+                            # Si el telefono ya esta registrado no se agenda a nombre de
+                            # otra persona en silencio: se le pide que entre como
+                            # registrado (asi tampoco se revela de quien es ese numero).
+                            if db.find_cliente_por_telefono(telefono.strip()):
+                                st.warning(
+                                    "Ese teléfono ya está registrado. Elige "
+                                    f"'Sí, ya soy {V['cliente']}' arriba y búscate con tu teléfono.")
+                            else:
+                                cliente_id = db.add_cliente(nombre.strip(), telefono.strip(), email.strip(), "")
+                                cliente = {"id": cliente_id, "nombre": nombre.strip(), "email": email.strip()}
+                                _confirmar(cliente, notas)
+
+    ui.pie()
 
 
 # ---------------------------------------------------------------- Ruteo: publico vs panel del negocio
@@ -464,9 +554,14 @@ if "rol" not in st.session_state:
     st.session_state.rol = None
 
 if not st.session_state.staff_autenticado:
-    st.title("🔒 Panel del negocio")
-    clave = st.text_input("Clave de acceso", type="password")
-    if st.button("Entrar"):
+    ui.barra_plataforma(ES_DEMO)
+    ui.encabezado_negocio(negocio, "Panel privado del negocio", V["icono"])
+    _izq, centro, _der = st.columns([1, 2, 1])
+    with centro, st.container(key="card_principal"):
+        ui.titulo_seccion("ACCESO", "🔒 Entrar al panel", "Usa la clave del personal o la del dueño.")
+        clave = st.text_input("Clave de acceso", type="password")
+        entrar = st.button("Entrar", type="primary", use_container_width=True)
+    if entrar:
         clave_dueno = _secreto("dueno_password")
         clave_staff = _secreto("staff_password")
         if clave_dueno and clave == clave_dueno:
@@ -483,13 +578,18 @@ if not st.session_state.staff_autenticado:
 
 if negocio.get("logo_base64"):
     with st.sidebar:
-        mostrar_logo(negocio, ancho=100)
+        mostrar_logo(negocio, ancho=88)
 st.sidebar.title(negocio["nombre"])
-st.sidebar.caption(negocio["tipo"])
-if st.sidebar.button("Salir del panel"):
-    st.session_state.staff_autenticado = False
-    st.session_state.rol = None
-    st.rerun()
+st.sidebar.caption(f"{V['subtitulo']} · {'Dueño' if st.session_state.rol == 'dueño' else 'Personal'}")
+
+ICONOS_MENU = {"Agenda del día": "📅", "Nueva cita": "➕", V["Clientes"]: "👥", "Servicios": "🧾",
+               "Personal": V["icono_personal"], "Configuración": "⚙️", "Estadísticas": "📊"}
+paginas = ["Agenda del día", "Nueva cita", V["Clientes"], "Servicios", "Personal", "Configuración"]
+if st.session_state.rol == "dueño":
+    paginas.append("Estadísticas")
+pagina = st.sidebar.radio("Menú", paginas, format_func=lambda p: f"{ICONOS_MENU.get(p, '')}  {p}",
+                          label_visibility="collapsed")
+st.sidebar.divider()
 with st.sidebar.expander(f"Link para que agenden los {V['clientes']}"):
     if NEGOCIO_SLUG:
         st.caption(
@@ -506,11 +606,13 @@ with st.sidebar.expander(f"Link para que agenden los {V['clientes']}"):
             "esto vive en https://mi-negocio.streamlit.app/?panel=staff, "
             f"el link para {V['clientes']} es https://mi-negocio.streamlit.app/"
         )
+if st.sidebar.button("Cerrar sesión", use_container_width=True):
+    st.session_state.staff_autenticado = False
+    st.session_state.rol = None
+    st.rerun()
+st.sidebar.caption("Powered by Aika Solutions")
 
-paginas = ["Agenda del día", "Nueva cita", V["Clientes"], "Servicios", "Personal", "Configuración"]
-if st.session_state.rol == "dueño":
-    paginas.append("Estadísticas")
-pagina = st.sidebar.radio("Ir a:", paginas)
+ui.barra_plataforma(ES_DEMO)
 
 
 # ---------------------------------------------------------------- Agenda del dia
@@ -519,14 +621,31 @@ if pagina == "Agenda del día":
 
     col1, col2 = st.columns([1, 2])
     with col1:
-        fecha_sel = st.date_input("Fecha", value=hoy_negocio())
+        fecha_sel = st.date_input("Fecha", value=hoy_negocio(), format="DD/MM/YYYY")
     proveedores = db.list_proveedores(solo_activos=True)
     with col2:
         opciones_prov = {0: "Todos"} | {p["id"]: p["nombre"] for p in proveedores}
-        prov_sel = st.selectbox("Proveedor", options=list(opciones_prov.keys()),
-                                 format_func=lambda pid: opciones_prov[pid])
+        prov_sel = st.selectbox("Especialista", options=list(opciones_prov.keys()), format_func=lambda pid: opciones_prov[pid])
 
     citas = db.list_citas(fecha=fecha_sel.isoformat(), proveedor_id=prov_sel or None)
+
+    # ---- Indicadores de arriba
+    activas = [c for c in citas if c["estado"] != "Cancelada"]
+    pendientes = [c for c in citas if c["estado"] == "Agendada"]
+    n_clientes = len(db.list_clientes())
+    if st.session_state.rol == "dueño":
+        hoy_ = hoy_negocio()
+        fin_mes = db.citas_finalizadas(hoy_.replace(day=1).isoformat(), hoy_.isoformat())
+        ingresos_mes = sum(r["precio"] for r in fin_mes if r["estado"] == "Completada")
+        cuarto = ("💵", "Ingresos del mes", f"${ingresos_mes:,.0f}", "#ECFDF5", "#047857")
+    else:
+        cuarto = (V["icono_personal"], V["especialistas"], len(proveedores), "#F5F3FF", "#6D28D9")
+    ui.kpis([
+        ("📅", f"Citas del {fecha_sel.strftime('%d/%m')}", len(activas), ui.TEAL_CLARO, ui.TEAL),
+        ("⏳", "Pendientes por atender", len(pendientes), "#EEF2FF", "#4338CA"),
+        ("👥", f"{V['Clientes']} registrados", n_clientes, "#EFF6FF", "#1D4ED8"),
+        cuarto,
+    ])
 
     # Listas completas (no solo activos) para que una cita ya creada con un
     # servicio/proveedor que despues se desactivo se pueda seguir editando.
@@ -542,28 +661,22 @@ if pagina == "Agenda del día":
         st.info("No hay citas agendadas para este día (con este filtro).")
     for c in citas:
         with st.container(border=True):
-            c1, c2, c3 = st.columns([2, 2, 1])
-            with c1:
-                st.markdown(f"**{c['hora_inicio']} - {c['hora_fin']}**  {etiqueta_estado(c['estado'])} {c['estado']}")
-                st.write(f"{V['Cliente']}: {c['cliente_nombre']} ({c['cliente_telefono'] or 'sin teléfono'})")
-            with c2:
-                st.write(f"Servicio: {c['servicio_nombre']}")
-                st.write(f"Con: {c['proveedor_nombre']}")
-            with c3:
-                if c["estado"] == "Agendada":
-                    if st.button("Editar", key=f"edit_{c['id']}"):
-                        st.session_state.editando_cita = c["id"]
-                        st.rerun()
-                    if st.button("Completar", key=f"comp_{c['id']}"):
-                        db.cambiar_estado_cita(c["id"], "Completada")
-                        st.rerun()
-                    if st.button("Cancelar", key=f"canc_{c['id']}"):
-                        db.cambiar_estado_cita(c["id"], "Cancelada")
-                        google_calendar.borrar_evento(c["evento_calendar_id"])
-                        st.rerun()
-                    if st.button("No asistio", key=f"noasi_{c['id']}"):
-                        db.cambiar_estado_cita(c["id"], "No asistio")
-                        st.rerun()
+            st.markdown(ui.tarjeta_cita_html(c, V["Cliente"]), unsafe_allow_html=True)
+            if c["estado"] == "Agendada":
+                b1, b2, b3, b4 = st.columns(4)
+                if b1.button("✓ Completar", key=f"comp_{c['id']}", type="primary", use_container_width=True):
+                    db.cambiar_estado_cita(c["id"], "Completada")
+                    st.rerun()
+                if b2.button("✎ Editar", key=f"edit_{c['id']}", use_container_width=True):
+                    st.session_state.editando_cita = c["id"]
+                    st.rerun()
+                if b3.button("No asistió", key=f"noasi_{c['id']}", use_container_width=True):
+                    db.cambiar_estado_cita(c["id"], "No asistio")
+                    st.rerun()
+                if b4.button("Cancelar", key=f"canc_{c['id']}", use_container_width=True):
+                    db.cambiar_estado_cita(c["id"], "Cancelada")
+                    google_calendar.borrar_evento(c["evento_calendar_id"])
+                    st.rerun()
 
             if st.session_state.editando_cita == c["id"]:
                 st.divider()
@@ -662,14 +775,15 @@ elif pagina == "Nueva cita":
                 st.warning("No hay horarios disponibles para ese proveedor en esa fecha.")
             else:
                 st.write("Hora disponible")
-                hora_cita = selector_horarios(horarios, key_prefix="staff_nueva")
+                with st.container(key="horarios"):
+                    hora_cita = selector_horarios(horarios, key_prefix="staff_nueva")
 
                 with st.form("form_nueva_cita"):
                     cliente_id = st.selectbox(V["Cliente"], options=[c["id"] for c in clientes],
                                                format_func=lambda cid: next(c["nombre"] for c in clientes if c["id"] == cid))
                     notas = st.text_area("Notas (opcional)")
 
-                    if st.form_submit_button("Agendar cita"):
+                    if st.form_submit_button("Agendar cita", type="primary", use_container_width=True):
                         try:
                             cita_id = db.agendar_cita(cliente_id, proveedor_id, servicio_id, fecha_cita.isoformat(),
                                                        hora_cita, duracion, notas)

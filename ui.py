@@ -1,0 +1,319 @@
+"""
+Capa visual de la app (Aika Solutions): estilos (CSS) y piezas de HTML
+reutilizables - barra de la plataforma, encabezado del negocio, pasos
+numerados, tarjetas de indicadores, etiquetas de estado y pie de pagina.
+
+Streamlit no deja estilizar todo con parametros, asi que aqui se inyecta un
+solo bloque de CSS. Las secciones con tarjetas (servicios, especialistas,
+horarios) se envuelven en st.container(key="...") y el CSS las ubica por la
+clase "st-key-<key>" que Streamlit les pone - asi los estilos no se
+"contagian" a otras partes de la app.
+"""
+
+import html
+
+import streamlit as st
+
+# Paleta de la marca
+TEAL = "#0F766E"
+TEAL_MEDIO = "#14B8A6"
+TEAL_CLARO = "#F0FDFA"
+TEAL_BORDE = "#99F6E4"
+NAVY = "#0B1324"
+NAVY_2 = "#111C33"
+TEXTO = "#0F172A"
+TEXTO_SUAVE = "#64748B"
+BORDE = "#E2E8F0"
+FONDO = "#F6F8FB"
+AMBAR = "#F59E0B"
+ROJO = "#E11D48"
+
+# Colores de los estados de una cita (tambien los usan las graficas)
+COLOR_ESTADO = {
+    "Completada": TEAL,
+    "Cancelada": "#CBD5E1",
+    "No asistio": "#FBBF24",
+}
+_CHIP_ESTADO = {
+    "Agendada": ("#EEF2FF", "#4338CA", "Agendada"),
+    "Completada": (TEAL_CLARO, TEAL, "Completada"),
+    "Cancelada": ("#F1F5F9", "#475569", "Cancelada"),
+    "No asistio": ("#FFFBEB", "#B45309", "No asistió"),
+}
+
+_CSS = f"""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+html, body, [data-testid="stApp"], [data-testid="stApp"] * {{
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}}
+/* Los iconos de Streamlit usan su propia fuente de simbolos: no tocarla */
+[data-testid="stApp"] [data-testid="stIconMaterial"],
+[data-testid="stApp"] span.material-symbols-rounded {{
+    font-family: 'Material Symbols Rounded' !important;
+}}
+[data-testid="stApp"] {{ background: {FONDO}; }}
+[data-testid="stMainBlockContainer"] {{ padding-top: 1.2rem; padding-bottom: 3rem; max-width: 1080px; }}
+
+/* Quitar la "marca" de Streamlit: encabezado, botones Fork/GitHub, anclas */
+[data-testid="stHeader"] {{ background: transparent; height: 0; }}
+[data-testid="stToolbarActions"], [data-testid="stMainMenu"] {{ display: none !important; }}
+[data-testid="stHeaderActionElements"] {{ display: none !important; }}
+footer {{ visibility: hidden; }}
+
+h1, h2, h3 {{ color: {TEXTO}; letter-spacing: -0.02em; }}
+h1 {{ font-weight: 800 !important; }}
+
+/* Botones */
+[data-testid="stBaseButton-primary"], [data-testid="stBaseButton-primaryFormSubmit"] {{
+    background: {TEAL} !important; border: 1px solid {TEAL} !important; color: #fff !important;
+    border-radius: 12px !important; font-weight: 700 !important;
+    box-shadow: 0 6px 16px -8px rgba(15,118,110,.55);
+}}
+[data-testid="stBaseButton-primary"]:hover, [data-testid="stBaseButton-primaryFormSubmit"]:hover {{
+    background: #0B5F59 !important; border-color: #0B5F59 !important;
+}}
+[data-testid="stBaseButton-secondary"], [data-testid="stBaseButton-secondaryFormSubmit"] {{
+    border-radius: 12px !important; border: 1px solid {BORDE} !important; background: #fff !important;
+    color: {TEXTO} !important; font-weight: 600 !important;
+}}
+[data-testid="stBaseButton-secondary"]:hover, [data-testid="stBaseButton-secondaryFormSubmit"]:hover {{
+    border-color: {TEAL} !important; color: {TEAL} !important;
+}}
+
+/* Campos */
+[data-testid="stTextInput"] input, [data-testid="stTextArea"] textarea,
+[data-testid="stNumberInput"] input, [data-testid="stDateInput"] input {{ border-radius: 10px; }}
+[data-testid="stSelectbox"] > div > div, [data-baseweb="select"] > div {{ border-radius: 10px !important; }}
+[data-testid="stWidgetLabel"] p {{ font-weight: 600; color: {TEXTO}; font-size: .88rem; }}
+
+/* Tarjetas (contenedores con borde) */
+[data-testid="stVerticalBlockBorderWrapper"]:has(> div > [data-testid="stVerticalBlock"]) {{
+    background: #fff;
+}}
+.st-key-card_principal, .st-key-card_datos {{
+    background: #fff; border: 1px solid {BORDE}; border-radius: 22px;
+    padding: 1.6rem 1.8rem; box-shadow: 0 10px 30px -18px rgba(15,23,42,.25);
+}}
+.st-key-card_datos {{ padding: 1.3rem 1.5rem; border-radius: 18px; box-shadow: none; background: #FBFCFE; }}
+@media (max-width: 640px) {{
+  .st-key-card_principal {{ padding: 1.1rem 1rem; border-radius: 18px; }}
+}}
+
+/* Tarjetas seleccionables (radio convertido en tarjetas) */
+.st-key-tarjetas_servicio [role="radiogroup"], .st-key-tarjetas_especialista [role="radiogroup"] {{
+    display: grid !important; gap: 12px; width: 100%;
+}}
+.st-key-tarjetas_servicio [role="radiogroup"] {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+.st-key-tarjetas_especialista [role="radiogroup"] {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
+@media (max-width: 640px) {{
+  .st-key-tarjetas_servicio [role="radiogroup"], .st-key-tarjetas_especialista [role="radiogroup"] {{
+      grid-template-columns: 1fr;
+  }}
+}}
+.st-key-tarjetas_servicio [role="radiogroup"] > label, .st-key-tarjetas_especialista [role="radiogroup"] > label {{
+    background: #fff; border: 1.5px solid {BORDE}; border-radius: 16px; padding: 14px 16px !important;
+    margin: 0 !important; width: 100%; min-height: 64px; cursor: pointer;
+    transition: border-color .15s, box-shadow .15s, background .15s; align-items: center;
+}}
+.st-key-tarjetas_servicio [role="radiogroup"] > label:hover,
+.st-key-tarjetas_especialista [role="radiogroup"] > label:hover {{ border-color: {TEAL_BORDE}; }}
+.st-key-tarjetas_servicio [role="radiogroup"] > label:has(input:checked),
+.st-key-tarjetas_especialista [role="radiogroup"] > label:has(input:checked) {{
+    border-color: {TEAL}; background: {TEAL_CLARO}; box-shadow: 0 0 0 3px rgba(20,184,166,.15);
+}}
+/* esconder el circulito del radio */
+.st-key-tarjetas_servicio [role="radiogroup"] > label > div:first-child,
+.st-key-tarjetas_especialista [role="radiogroup"] > label > div:first-child {{ display: none; }}
+.st-key-tarjetas_servicio [role="radiogroup"] p, .st-key-tarjetas_especialista [role="radiogroup"] p {{
+    margin: 0; color: {TEXTO};
+}}
+.st-key-tarjetas_especialista [role="radiogroup"] > label {{ justify-content: center; text-align: center; }}
+
+/* Horarios en "pastillas" */
+.st-key-horarios [data-testid="stHorizontalBlock"] {{ flex-wrap: wrap; gap: 10px; }}
+.st-key-horarios [data-testid="stColumn"] {{
+    flex: 1 1 calc(33.33% - 10px) !important; min-width: calc(33.33% - 10px) !important;
+}}
+@media (min-width: 900px) {{
+  .st-key-horarios [data-testid="stColumn"] {{
+      flex: 1 1 calc(16.66% - 10px) !important; min-width: calc(16.66% - 10px) !important;
+  }}
+}}
+.st-key-horarios button {{ border-radius: 999px !important; padding: .35rem .5rem !important; font-weight: 700 !important; }}
+
+/* Indicadores (st.metric) como tarjetas */
+[data-testid="stMetric"] {{
+    background: #fff; border: 1px solid {BORDE}; border-radius: 18px; padding: 16px 18px;
+    box-shadow: 0 6px 18px -14px rgba(15,23,42,.3);
+}}
+[data-testid="stMetricLabel"] p {{ color: {TEXTO_SUAVE}; font-weight: 600; }}
+[data-testid="stMetricValue"] {{ color: {TEXTO}; font-weight: 800; }}
+
+/* Barra lateral del panel */
+[data-testid="stSidebar"] {{ background: linear-gradient(180deg, {NAVY} 0%, {NAVY_2} 100%); }}
+[data-testid="stSidebar"] * {{ color: #E2E8F0; }}
+[data-testid="stSidebar"] h1 {{ color: #fff; font-size: 1.15rem !important; }}
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {{ color: #94A3B8 !important; }}
+[data-testid="stSidebar"] [role="radiogroup"] {{ gap: 4px; }}
+[data-testid="stSidebar"] [role="radiogroup"] > label {{
+    padding: 9px 12px !important; border-radius: 10px; margin: 0 !important; width: 100%;
+}}
+[data-testid="stSidebar"] [role="radiogroup"] > label > div:first-child {{ display: none; }}
+[data-testid="stSidebar"] [role="radiogroup"] > label:hover {{ background: rgba(255,255,255,.06); }}
+[data-testid="stSidebar"] [role="radiogroup"] > label:has(input:checked) {{ background: rgba(20,184,166,.18); }}
+[data-testid="stSidebar"] [role="radiogroup"] > label:has(input:checked) p {{ color: #5EEAD4 !important; font-weight: 700; }}
+[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] {{
+    background: rgba(255,255,255,.06) !important; border-color: rgba(255,255,255,.12) !important; color: #E2E8F0 !important;
+}}
+[data-testid="stSidebar"] [data-testid="stExpander"] details {{ border-color: rgba(255,255,255,.12); }}
+
+/* Componentes propios (HTML) */
+.ak-barra {{
+    background: {NAVY}; color: #CBD5E1; border-radius: 16px; padding: 10px 16px; margin-bottom: 14px;
+    display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; font-size: .85rem;
+}}
+.ak-barra b {{ color: #fff; }}
+.ak-pill {{
+    display: inline-block; background: rgba(20,184,166,.18); color: #5EEAD4; border: 1px solid rgba(94,234,212,.35);
+    border-radius: 999px; padding: 2px 10px; font-weight: 800; font-size: .72rem; letter-spacing: .06em; margin-right: 8px;
+}}
+.ak-plan {{ color: #94A3B8; }} .ak-plan b {{ color: #5EEAD4; }}
+.ak-header {{
+    display: flex; align-items: center; gap: 16px; background: #fff; border: 1px solid {BORDE};
+    border-radius: 20px; padding: 14px 18px; margin-bottom: 18px;
+}}
+.ak-logo {{ width: 60px; height: 60px; border-radius: 16px; object-fit: contain; background: #fff; border: 1px solid {BORDE}; }}
+.ak-logo-ph {{
+    width: 60px; height: 60px; border-radius: 16px; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, {TEAL} 0%, {TEAL_MEDIO} 100%); font-size: 30px;
+}}
+.ak-nombre {{ font-size: 1.35rem; font-weight: 800; color: {TEXTO}; line-height: 1.15; letter-spacing: -0.02em; }}
+.ak-sub {{ color: {TEXTO_SUAVE}; font-size: .88rem; margin-top: 2px; }}
+.ak-kicker {{
+    display: inline-block; background: {TEAL_CLARO}; color: {TEAL}; border: 1px solid {TEAL_BORDE};
+    border-radius: 999px; padding: 3px 12px; font-size: .72rem; font-weight: 800; letter-spacing: .08em;
+}}
+.ak-titulo {{ font-size: 1.75rem; font-weight: 800; color: {TEXTO}; margin: 10px 0 2px; letter-spacing: -0.02em; }}
+.ak-desc {{ color: {TEXTO_SUAVE}; margin-bottom: 6px; }}
+.ak-sep {{ height: 1px; background: {BORDE}; margin: 14px 0 6px; }}
+.ak-paso {{ display: flex; align-items: center; gap: 10px; font-weight: 700; color: {TEXTO}; margin: 18px 0 8px; }}
+.ak-num {{
+    width: 26px; height: 26px; border-radius: 999px; background: {TEAL}; color: #fff; display: inline-flex;
+    align-items: center; justify-content: center; font-size: .8rem; font-weight: 800; flex: none;
+}}
+.ak-kpis {{ display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; margin: 4px 0 18px; }}
+@media (max-width: 820px) {{ .ak-kpis {{ grid-template-columns: repeat(2, minmax(0,1fr)); }} }}
+.ak-kpi {{
+    background: #fff; border: 1px solid {BORDE}; border-radius: 18px; padding: 14px 16px;
+    display: flex; gap: 12px; align-items: center; box-shadow: 0 6px 18px -14px rgba(15,23,42,.3);
+}}
+.ak-kpi-ico {{ width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex: none; }}
+.ak-kpi-lbl {{ color: {TEXTO_SUAVE}; font-size: .8rem; font-weight: 600; line-height: 1.2; }}
+.ak-kpi-val {{ color: {TEXTO}; font-size: 1.4rem; font-weight: 800; line-height: 1.2; }}
+.ak-chip {{ display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: .75rem; font-weight: 700; }}
+.ak-cita-hora {{ font-size: 1.05rem; font-weight: 800; color: {TEXTO}; }}
+.ak-cita-linea {{ color: {TEXTO_SUAVE}; font-size: .9rem; margin-top: 2px; }}
+.ak-cita-linea b {{ color: {TEXTO}; font-weight: 600; }}
+.ak-pie {{ text-align: center; color: #94A3B8; font-size: .8rem; margin-top: 28px; }}
+.ak-pie b {{ color: {TEAL}; }}
+.ak-landing {{
+    background: linear-gradient(135deg, {NAVY} 0%, #0F2A3D 60%, {TEAL} 140%); color: #E2E8F0;
+    border-radius: 24px; padding: 48px 36px; margin-top: 10px;
+}}
+.ak-landing h1 {{ color: #fff !important; font-size: 2.4rem; margin: 10px 0 6px; }}
+.ak-landing p {{ color: #CBD5E1; font-size: 1.05rem; max-width: 640px; }}
+.ak-feats {{ display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; margin-top: 18px; }}
+@media (max-width: 820px) {{ .ak-feats {{ grid-template-columns: 1fr; }} }}
+.ak-feat {{ background: #fff; border: 1px solid {BORDE}; border-radius: 18px; padding: 18px; }}
+.ak-feat b {{ color: {TEXTO}; display: block; margin: 6px 0 4px; }}
+.ak-feat span {{ color: {TEXTO_SUAVE}; font-size: .9rem; }}
+</style>
+"""
+
+
+def _h(texto):
+    return html.escape(str(texto or ""))
+
+
+def _html(contenido):
+    st.markdown(contenido, unsafe_allow_html=True)
+
+
+def inyectar_estilos():
+    _html(_CSS)
+
+
+def barra_plataforma(es_demo):
+    if es_demo:
+        _html(
+            '<div class="ak-barra"><div><span class="ak-pill">DEMO</span>'
+            'Plataforma de agenda para clínicas y consultorios · Powered by <b>Aika Solutions</b></div>'
+            '<div class="ak-plan">Plan activo: <b>Demo Enterprise</b></div></div>'
+        )
+
+
+def encabezado_negocio(negocio, subtitulo, icono):
+    if negocio.get("logo_base64"):
+        logo = f'<img class="ak-logo" src="data:image/png;base64,{negocio["logo_base64"]}" alt="logo">'
+    else:
+        logo = f'<div class="ak-logo-ph">{icono}</div>'
+    _html(
+        f'<div class="ak-header">{logo}<div><div class="ak-nombre">{_h(negocio["nombre"])}</div>'
+        f'<div class="ak-sub">{_h(subtitulo)}</div></div></div>'
+    )
+
+
+def titulo_seccion(kicker, titulo, descripcion=""):
+    desc = f'<div class="ak-desc">{_h(descripcion)}</div>' if descripcion else ""
+    _html(f'<span class="ak-kicker">{_h(kicker)}</span><div class="ak-titulo">{_h(titulo)}</div>{desc}'
+          '<div class="ak-sep"></div>')
+
+
+def paso(numero, texto):
+    _html(f'<div class="ak-paso"><span class="ak-num">{numero}</span>{_h(texto)}</div>')
+
+
+def kpis(items):
+    """items: lista de (icono, etiqueta, valor, color_fondo, color_icono)."""
+    tarjetas = "".join(
+        f'<div class="ak-kpi"><div class="ak-kpi-ico" style="background:{fondo};color:{color}">{icono}</div>'
+        f'<div><div class="ak-kpi-lbl">{_h(etq)}</div><div class="ak-kpi-val">{_h(val)}</div></div></div>'
+        for icono, etq, val, fondo, color in items
+    )
+    _html(f'<div class="ak-kpis">{tarjetas}</div>')
+
+
+def chip_estado(estado):
+    fondo, color, texto = _CHIP_ESTADO.get(estado, ("#F1F5F9", "#475569", estado))
+    return f'<span class="ak-chip" style="background:{fondo};color:{color}">{_h(texto)}</span>'
+
+
+def tarjeta_cita_html(c, etiqueta_cliente):
+    tel = c.get("cliente_telefono") or "sin teléfono"
+    return (
+        f'<div class="ak-cita-hora">{_h(c["hora_inicio"])} – {_h(c["hora_fin"])} &nbsp;{chip_estado(c["estado"])}</div>'
+        f'<div class="ak-cita-linea">{_h(etiqueta_cliente)}: <b>{_h(c["cliente_nombre"])}</b> · {_h(tel)}</div>'
+        f'<div class="ak-cita-linea">{_h(c["servicio_nombre"])} · con <b>{_h(c["proveedor_nombre"])}</b></div>'
+    )
+
+
+def pie():
+    _html('<div class="ak-pie">Agenda en línea · Powered by <b>Aika Solutions</b></div>')
+
+
+def portada_plataforma():
+    _html(
+        '<div class="ak-landing"><span class="ak-pill">AIKA SOLUTIONS</span>'
+        '<h1>Agenda de citas en línea para tu clínica</h1>'
+        '<p>Tus pacientes reservan solos, 24/7, viendo solo horarios realmente disponibles. '
+        'Tú controlas agenda, especialistas, servicios y ganancias desde un panel privado.</p></div>'
+        '<div class="ak-feats">'
+        '<div class="ak-feat">📅<b>Reservas en línea</b><span>Link propio para que tus pacientes agenden sin llamar.</span></div>'
+        '<div class="ak-feat">🧑‍⚕️<b>Agenda por especialista</b><span>Sin empalmes, con horario de comida y días laborales.</span></div>'
+        '<div class="ak-feat">📊<b>Estadísticas</b><span>Ingresos, cancelaciones e inasistencias por periodo.</span></div>'
+        '</div>'
+    )
+    _html('<div class="ak-pie">¿Te compartieron el link de tu clínica? Revisa que esté completo: '
+          'termina en algo como <code>?negocio=nombre</code>.</div>')
