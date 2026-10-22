@@ -697,7 +697,8 @@ if st.session_state.rol == "dueño":
 pagina = st.sidebar.radio("Menú", paginas, format_func=lambda p: f"{ICONOS_MENU.get(p, '')}  {p}",
                           label_visibility="collapsed")
 # En celular/tableta el menu tapa la pantalla: al elegir una opcion se cierra solo
-if st.session_state.get("_pagina_anterior") not in (None, pagina):
+# ...y tambien al entrar al panel: en celular se empieza viendo la agenda, no el menu
+if st.session_state.get("_pagina_anterior") != pagina:
     ui.cerrar_menu_en_celular()
 st.session_state["_pagina_anterior"] = pagina
 st.sidebar.divider()
@@ -731,9 +732,19 @@ if pagina == "Agenda del día":
 
     citas = db.list_citas(fecha=fecha_sel.isoformat(), proveedor_id=prov_sel or None)
 
+    # Citas que siguen "Agendada" aunque su hora de fin ya paso: hay que
+    # registrarlas (completada / no asistio / cancelada)
+    _ahora = ahora_negocio()
+    _hoy_iso, _hora_ahora = _ahora.date().isoformat(), _ahora.strftime("%H:%M")
+
+    def ya_paso(c):
+        return c["estado"] == "Agendada" and (
+            c["fecha"] < _hoy_iso or (c["fecha"] == _hoy_iso and c["hora_fin"] <= _hora_ahora))
+
     # ---- Indicadores de arriba
     activas = [c for c in citas if c["estado"] != "Cancelada"]
-    pendientes = [c for c in citas if c["estado"] == "Agendada"]
+    pendientes = [c for c in citas if c["estado"] == "Agendada" and not ya_paso(c)]
+    sin_registrar = [c for c in citas if ya_paso(c)]
     n_clientes = len(db.list_clientes())
     if st.session_state.rol == "dueño":
         hoy_ = hoy_negocio()
@@ -744,7 +755,7 @@ if pagina == "Agenda del día":
         cuarto = (V["icono_personal"], V["especialistas"], len(proveedores), "#F5F3FF", "#6D28D9")
     ui.kpis([
         ("📅", f"Citas del {fecha_sel.strftime('%d/%m')}", len(activas), ui.TEAL_CLARO, ui.TEAL),
-        ("⏳", "Pendientes por atender", len(pendientes), "#EEF2FF", "#4338CA"),
+        ("⏳", "Por atender", len(pendientes), "#EEF2FF", "#4338CA"),
         ("👥", f"{V['Clientes']} registrados", n_clientes, "#EFF6FF", "#1D4ED8"),
         cuarto,
     ])
@@ -761,9 +772,14 @@ if pagina == "Agenda del día":
 
     if not citas:
         st.info("No hay citas agendadas para este día (con este filtro).")
+    if sin_registrar:
+        st.warning(
+            f"⚠️ {len(sin_registrar)} cita(s) ya pasaron su hora y siguen como \"Agendada\". "
+            "Márcalas como **Completada**, **No asistió** o **Cancelada** para que tus estadísticas cuadren.")
     for c in citas:
-        with st.container(border=True):
-            st.markdown(ui.tarjeta_cita_html(c, V["Cliente"]), unsafe_allow_html=True)
+        pasada = ya_paso(c)
+        with st.container(border=True, key=f"{'cita_pasada' if pasada else 'cita'}_{c['id']}"):
+            st.markdown(ui.tarjeta_cita_html(c, V["Cliente"], hora_pasada=pasada), unsafe_allow_html=True)
             if c["estado"] == "Agendada":
                 b1, b2, b3, b4 = st.columns(4)
                 if b1.button("✓ Completar", key=f"comp_{c['id']}", type="primary", use_container_width=True):

@@ -28,6 +28,17 @@ jobs:
           mkdir -p .streamlit
           printf 'staff_password = "prueba-staff-ci"\ndueno_password = "prueba-dueno-ci"\n' > .streamlit/secrets.toml
           echo SI | python cargar_demo.py
+          # Simular citas de hoy cuya hora ya paso y siguen "Agendada"
+          python - <<'PY2'
+          import sqlite3
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          ahora = datetime.now(ZoneInfo("America/Mexico_City"))
+          c = sqlite3.connect("agenda_citas.db")
+          n = c.execute("UPDATE citas SET estado='Agendada' WHERE fecha=? AND hora_fin<=?",
+                        (ahora.date().isoformat(), ahora.strftime("%H:%M"))).rowcount
+          c.commit(); print("citas pasadas simuladas:", n)
+          PY2
       - name: Levantar la app
         run: |
           nohup streamlit run app.py --server.headless true --server.port 8501 > streamlit.log 2>&1 &
@@ -46,7 +57,7 @@ jobs:
               pg.get_by_label("Clave de acceso").fill("prueba-dueno-ci")
               pg.get_by_role("button", name="Entrar").click()
               pg.wait_for_timeout(5000)
-              pg.screenshot(path="1_panel.png")
+              pg.screenshot(path="1_panel.png", full_page=True)
               open("encabezado.html", "w").write(pg.evaluate(
                   "() => (document.querySelector('[data-testid=\"stHeader\"]') || {outerHTML: 'sin header'}).outerHTML"))
               def estado():

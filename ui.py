@@ -278,6 +278,12 @@ h1 {{ font-weight: 800 !important; }}
 .ak-kpi-ico {{ width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex: none; }}
 .ak-kpi-lbl {{ color: {TEXTO_SUAVE}; font-size: .8rem; font-weight: 600; line-height: 1.2; }}
 .ak-kpi-val {{ color: {TEXTO}; font-size: 1.4rem; font-weight: 800; line-height: 1.2; }}
+/* Cita cuya hora ya paso y sigue sin registrar: tarjeta amarillo claro */
+[class*="st-key-cita_pasada_"] {{
+    background: #FFFBEB !important; border: 1.5px solid #FCD34D !important; border-radius: 14px;
+}}
+[class*="st-key-cita_pasada_"] > div {{ background: transparent !important; }}
+.ak-cita-aviso {{ color: #92400E; font-size: .86rem; font-weight: 600; margin-top: 6px; }}
 .ak-chip {{ display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: .75rem; font-weight: 700; }}
 .ak-cita-hora {{ font-size: 1.05rem; font-weight: 800; color: {TEXTO}; }}
 .ak-cita-linea {{ color: {TEXTO_SUAVE}; font-size: .9rem; margin-top: 2px; }}
@@ -454,12 +460,17 @@ def chip_estado(estado):
     return f'<span class="ak-chip" style="background:{fondo};color:{color}">{_h(texto)}</span>'
 
 
-def tarjeta_cita_html(c, etiqueta_cliente):
+def tarjeta_cita_html(c, etiqueta_cliente, hora_pasada=False):
     tel = c.get("cliente_telefono") or "sin teléfono"
+    chip = (chip_html("Ya pasó · sin registrar", "#FEF3C7", "#92400E") if hora_pasada
+            else chip_estado(c["estado"]))
+    aviso = ('<div class="ak-cita-aviso">⚠️ La hora de esta cita ya pasó. ¿Qué pasó con ella? '
+             'Márcala abajo como Completada, No asistió o Cancelada.</div>' if hora_pasada else "")
     return (
-        f'<div class="ak-cita-hora">{_h(c["hora_inicio"])} – {_h(c["hora_fin"])} &nbsp;{chip_estado(c["estado"])}</div>'
+        f'<div class="ak-cita-hora">{_h(c["hora_inicio"])} – {_h(c["hora_fin"])} &nbsp;{chip}</div>'
         f'<div class="ak-cita-linea">{_h(etiqueta_cliente)}: <b>{_h(c["cliente_nombre"])}</b> · {_h(tel)}</div>'
         f'<div class="ak-cita-linea">{_h(c["servicio_nombre"])} · con <b>{_h(c["proveedor_nombre"])}</b></div>'
+        + aviso
     )
 
 
