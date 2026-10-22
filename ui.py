@@ -114,10 +114,7 @@ h1 {{ font-weight: 800 !important; }}
     display: grid !important; gap: 12px; width: 100%;
 }}
 .st-key-tarjetas_servicio [role="radiogroup"] {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
-.st-key-tarjetas_especialista [role="radiogroup"] {{ grid-template-columns: repeat(4, minmax(0, 1fr)); }}
-@media (max-width: 900px) {{
-  .st-key-tarjetas_especialista [role="radiogroup"] {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
-}}
+.st-key-tarjetas_especialista [role="radiogroup"] {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
 @media (max-width: 640px) {{
   .st-key-tarjetas_servicio [role="radiogroup"], .st-key-tarjetas_especialista [role="radiogroup"] {{
       grid-template-columns: 1fr;
