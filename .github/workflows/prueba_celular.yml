@@ -53,9 +53,12 @@ jobs:
                     return sb ? sb.getAttribute('aria-expanded') : 'sin sidebar';
                   }""")
               print("Menu al entrar (aria-expanded):", estado())
-              print("Botones en el encabezado:", pg.evaluate("""() =>
-                  [...document.querySelectorAll('[data-testid]')].map(e => e.dataset.testid)
-                  .filter(t => /Sidebar|Collapse|Expand/i.test(t))"""))
+              print("Botones del menu (testid, visible, dentro de stToolbar):", pg.evaluate("""() =>
+                  [...document.querySelectorAll('[data-testid]')]
+                  .filter(e => /Sidebar|Collapse|Expand/i.test(e.dataset.testid))
+                  .map(e => [e.dataset.testid, e.offsetParent !== null, !!e.closest('[data-testid="stToolbar"]')])"""))
+              print("Fork visible:", pg.evaluate("""() => [...document.querySelectorAll('*')]
+                  .some(e => e.children.length === 0 && /^\\s*Fork\\s*$/.test(e.textContent) && e.offsetParent !== null)"""))
               if estado() != "true":
                   for sel in ['[data-testid="stExpandSidebarButton"]', '[data-testid="stSidebarCollapsedControl"] button',
                               '[data-testid="stExpandSidebarButton"] button']:
