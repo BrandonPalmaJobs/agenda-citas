@@ -47,36 +47,36 @@ NEGOCIO = {
 
 # (nombre, duracion_min, precio MXN)
 SERVICIOS = [
-    ("Valoracion y diagnostico", 30, 350),
+    ("Valoración y diagnóstico", 30, 350),
     ("Limpieza dental", 45, 750),
-    ("Resina (curacion)", 60, 950),
-    ("Extraccion simple", 45, 1200),
+    ("Resina (curación)", 60, 950),
+    ("Extracción simple", 45, 1200),
     ("Blanqueamiento", 90, 3800),
     ("Endodoncia", 90, 4500),
     ("Ajuste de brackets", 30, 800),
-    ("Valoracion de ortodoncia", 30, 400),
+    ("Valoración de ortodoncia", 30, 400),
 ]
 
 # (nombre, especialidad, servicios que atiende)
 DENTISTAS = [
-    ("Dra. Mariana Lopez", "Odontologia general",
-     ["Valoracion y diagnostico", "Limpieza dental", "Resina (curacion)", "Extraccion simple", "Blanqueamiento"]),
+    ("Dra. Mariana López", "Odontología general",
+     ["Valoración y diagnóstico", "Limpieza dental", "Resina (curación)", "Extracción simple", "Blanqueamiento"]),
     ("Dr. Alejandro Ruiz", "Ortodoncia",
-     ["Ajuste de brackets", "Valoracion de ortodoncia", "Valoracion y diagnostico"]),
+     ["Ajuste de brackets", "Valoración de ortodoncia", "Valoración y diagnóstico"]),
     ("Dra. Fernanda Castillo", "Endodoncia",
-     ["Endodoncia", "Resina (curacion)", "Valoracion y diagnostico", "Limpieza dental"]),
+     ["Endodoncia", "Resina (curación)", "Valoración y diagnóstico", "Limpieza dental"]),
 ]
 
 # Pacientes ficticios. Telefonos de relleno (55 0000 0xxx) y SIN correo a
 # proposito: asi ningun recordatorio de WhatsApp ni invitacion de Google
 # Calendar le llega a una persona real.
 PACIENTES = [
-    "Ana Sofia Hernandez", "Luis Fernando Garcia", "Valeria Martinez", "Jorge Ramirez",
-    "Daniela Torres", "Ricardo Flores", "Camila Gomez", "Diego Morales", "Paola Jimenez",
-    "Andres Vargas", "Ximena Rojas", "Eduardo Mendoza", "Regina Castro", "Sebastian Ortiz",
-    "Natalia Guzman", "Miguel Angel Reyes", "Fernanda Aguilar", "Carlos Medina",
-    "Lucia Navarro", "Javier Salazar", "Mariana Rios", "Emilio Herrera", "Renata Cruz",
-    "Pablo Dominguez", "Isabella Vega", "Hector Sanchez", "Andrea Molina", "Tomas Delgado",
+    "Ana Sofía Hernández", "Luis Fernando García", "Valeria Martínez", "Jorge Ramírez",
+    "Daniela Torres", "Ricardo Flores", "Camila Gómez", "Diego Morales", "Paola Jiménez",
+    "Andrés Vargas", "Ximena Rojas", "Eduardo Mendoza", "Regina Castro", "Sebastián Ortiz",
+    "Natalia Guzmán", "Miguel Ángel Reyes", "Fernanda Aguilar", "Carlos Medina",
+    "Lucía Navarro", "Javier Salazar", "Mariana Ríos", "Emilio Herrera", "Renata Cruz",
+    "Pablo Domínguez", "Isabella Vega", "Héctor Sánchez", "Andrea Molina", "Tomás Delgado",
 ]
 
 DIAS_ATRAS = 60

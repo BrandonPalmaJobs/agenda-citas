@@ -101,35 +101,58 @@ h1 {{ font-weight: 800 !important; }}
   .st-key-card_principal {{ padding: 1.1rem 1rem; border-radius: 18px; }}
 }}
 
-/* Tarjetas seleccionables (radio convertido en tarjetas) */
+/* Tarjetas seleccionables (radio convertido en tarjetas).
+   Estructura de Streamlit: [role=radiogroup] > div(opcion, data-selected) >
+   label[stRadioOption] (circulo + texto) + div[stRadioCaption] (subtexto) */
+.st-key-tarjetas_servicio [data-testid="stElementContainer"],
+.st-key-tarjetas_especialista [data-testid="stElementContainer"] {{ width: 100% !important; }}
+.st-key-tarjetas_servicio [data-testid="stRadio"],
+.st-key-tarjetas_especialista [data-testid="stRadio"] {{ width: 100%; }}
 .st-key-tarjetas_servicio [role="radiogroup"], .st-key-tarjetas_especialista [role="radiogroup"] {{
     display: grid !important; gap: 12px; width: 100%;
 }}
 .st-key-tarjetas_servicio [role="radiogroup"] {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
-.st-key-tarjetas_especialista [role="radiogroup"] {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
+.st-key-tarjetas_especialista [role="radiogroup"] {{ grid-template-columns: repeat(4, minmax(0, 1fr)); }}
+@media (max-width: 900px) {{
+  .st-key-tarjetas_especialista [role="radiogroup"] {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+}}
 @media (max-width: 640px) {{
   .st-key-tarjetas_servicio [role="radiogroup"], .st-key-tarjetas_especialista [role="radiogroup"] {{
       grid-template-columns: 1fr;
   }}
 }}
-.st-key-tarjetas_servicio [role="radiogroup"] > label, .st-key-tarjetas_especialista [role="radiogroup"] > label {{
-    background: #fff; border: 1.5px solid {BORDE}; border-radius: 16px; padding: 14px 16px !important;
-    margin: 0 !important; width: 100%; min-height: 64px; cursor: pointer;
-    transition: border-color .15s, box-shadow .15s, background .15s; align-items: center;
+.st-key-tarjetas_servicio [role="radiogroup"] > div, .st-key-tarjetas_especialista [role="radiogroup"] > div {{
+    position: relative; background: #fff; border: 1.5px solid {BORDE}; border-radius: 16px;
+    padding: 14px 16px; margin: 0 !important; min-height: 70px; cursor: pointer;
+    display: flex; flex-direction: column; justify-content: center;
+    transition: border-color .15s, box-shadow .15s, background .15s, transform .15s;
 }}
-.st-key-tarjetas_servicio [role="radiogroup"] > label:hover,
-.st-key-tarjetas_especialista [role="radiogroup"] > label:hover {{ border-color: {TEAL_BORDE}; }}
-.st-key-tarjetas_servicio [role="radiogroup"] > label:has(input:checked),
-.st-key-tarjetas_especialista [role="radiogroup"] > label:has(input:checked) {{
-    border-color: {TEAL}; background: {TEAL_CLARO}; box-shadow: 0 0 0 3px rgba(20,184,166,.15);
+.st-key-tarjetas_servicio [role="radiogroup"] > div:hover,
+.st-key-tarjetas_especialista [role="radiogroup"] > div:hover {{ border-color: {TEAL_BORDE}; transform: translateY(-1px); }}
+.st-key-tarjetas_servicio [role="radiogroup"] > div[data-selected="true"],
+.st-key-tarjetas_especialista [role="radiogroup"] > div[data-selected="true"],
+.st-key-tarjetas_servicio [role="radiogroup"] > div:has(input:checked),
+.st-key-tarjetas_especialista [role="radiogroup"] > div:has(input:checked) {{
+    border-color: {TEAL}; background: {TEAL_CLARO}; box-shadow: 0 0 0 3px rgba(20,184,166,.16);
+}}
+/* toda la tarjeta es clickeable: el label se "estira" sobre la tarjeta */
+.st-key-tarjetas_servicio [data-testid="stRadioOption"],
+.st-key-tarjetas_especialista [data-testid="stRadioOption"] {{ position: static; width: 100%; margin: 0; padding: 0; }}
+.st-key-tarjetas_servicio [data-testid="stRadioOption"]::after,
+.st-key-tarjetas_especialista [data-testid="stRadioOption"]::after {{
+    content: ""; position: absolute; inset: 0; border-radius: 16px; cursor: pointer;
 }}
 /* esconder el circulito del radio */
-.st-key-tarjetas_servicio [role="radiogroup"] > label > div:first-child,
-.st-key-tarjetas_especialista [role="radiogroup"] > label > div:first-child {{ display: none; }}
-.st-key-tarjetas_servicio [role="radiogroup"] p, .st-key-tarjetas_especialista [role="radiogroup"] p {{
-    margin: 0; color: {TEXTO};
-}}
-.st-key-tarjetas_especialista [role="radiogroup"] > label {{ justify-content: center; text-align: center; }}
+.st-key-tarjetas_servicio [data-testid="stRadioOption"] > div > div:first-child,
+.st-key-tarjetas_especialista [data-testid="stRadioOption"] > div > div:first-child {{ display: none !important; }}
+.st-key-tarjetas_servicio [data-testid="stRadioOption"] p,
+.st-key-tarjetas_especialista [data-testid="stRadioOption"] p {{ margin: 0; color: {TEXTO}; font-size: .95rem; }}
+.st-key-tarjetas_servicio [data-testid="stRadioCaption"],
+.st-key-tarjetas_especialista [data-testid="stRadioCaption"] {{ padding-left: 0 !important; margin: 4px 0 0 0 !important; }}
+.st-key-tarjetas_servicio [data-testid="stRadioCaption"] p {{ color: {TEXTO_SUAVE}; font-weight: 600; font-size: .85rem; }}
+.st-key-tarjetas_especialista [role="radiogroup"] > div {{ align-items: center; text-align: center; }}
+.st-key-tarjetas_especialista [data-testid="stRadioOption"] p {{ font-size: .92rem; }}
+.st-key-tarjetas_especialista [data-testid="stRadioCaption"] p {{ color: {TEXTO_SUAVE}; font-size: .8rem; }}
 
 /* Horarios en "pastillas" */
 .st-key-horarios [data-testid="stHorizontalBlock"] {{ flex-wrap: wrap; gap: 10px; }}
@@ -157,13 +180,16 @@ h1 {{ font-weight: 800 !important; }}
 [data-testid="stSidebar"] h1 {{ color: #fff; font-size: 1.15rem !important; }}
 [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {{ color: #94A3B8 !important; }}
 [data-testid="stSidebar"] [role="radiogroup"] {{ gap: 4px; }}
-[data-testid="stSidebar"] [role="radiogroup"] > label {{
-    padding: 9px 12px !important; border-radius: 10px; margin: 0 !important; width: 100%;
+[data-testid="stSidebar"] [data-testid="stElementContainer"] {{ width: 100% !important; }}
+[data-testid="stSidebar"] [role="radiogroup"] > div {{
+    position: relative; padding: 9px 12px; border-radius: 10px; margin: 0 !important; width: 100%;
 }}
-[data-testid="stSidebar"] [role="radiogroup"] > label > div:first-child {{ display: none; }}
-[data-testid="stSidebar"] [role="radiogroup"] > label:hover {{ background: rgba(255,255,255,.06); }}
-[data-testid="stSidebar"] [role="radiogroup"] > label:has(input:checked) {{ background: rgba(20,184,166,.18); }}
-[data-testid="stSidebar"] [role="radiogroup"] > label:has(input:checked) p {{ color: #5EEAD4 !important; font-weight: 700; }}
+[data-testid="stSidebar"] [data-testid="stRadioOption"] {{ position: static; width: 100%; }}
+[data-testid="stSidebar"] [data-testid="stRadioOption"]::after {{ content: ""; position: absolute; inset: 0; }}
+[data-testid="stSidebar"] [data-testid="stRadioOption"] > div > div:first-child {{ display: none !important; }}
+[data-testid="stSidebar"] [role="radiogroup"] > div:hover {{ background: rgba(255,255,255,.06); }}
+[data-testid="stSidebar"] [role="radiogroup"] > div[data-selected="true"] {{ background: rgba(20,184,166,.18); }}
+[data-testid="stSidebar"] [role="radiogroup"] > div[data-selected="true"] p {{ color: #5EEAD4 !important; font-weight: 700; }}
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] {{
     background: rgba(255,255,255,.06) !important; border-color: rgba(255,255,255,.12) !important; color: #E2E8F0 !important;
 }}
