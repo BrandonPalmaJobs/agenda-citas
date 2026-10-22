@@ -25,8 +25,8 @@ DIAS_PRUEBA = 14
 # "Pacientes al mes" = pacientes distintos con al menos una cita (no cancelada) en el mes.
 NIVELES = {
     "basico": ("Básico", 499, 50),
-    "plus": ("Plus", 549, 100),
-    "pro": ("Pro", 599, 200),
+    "plus": ("Plus", 599, 100),
+    "pro": ("Pro", 699, 200),
 }
 NIVEL_PREDETERMINADO = "basico"
 
