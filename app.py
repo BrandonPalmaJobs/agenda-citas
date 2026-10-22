@@ -28,9 +28,40 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+import importlib
+import os
+
+import turso_adapter
 import db
 import google_calendar
 import ui
+
+
+def _recargar_si_cambio(*modulos):
+    """Streamlit Cloud vuelve a correr app.py cuando se actualiza el codigo,
+    pero a veces sigue usando la version VIEJA de los otros archivos (db.py,
+    ui.py...) que ya tenia cargados - y la app truena porque app.py pide algo
+    que el archivo viejo no tiene. Aqui se recarga cada archivo propio si
+    cambio desde la ultima vez."""
+    for modulo in modulos:
+        try:
+            fecha = os.path.getmtime(modulo.__file__)
+        except OSError:
+            continue
+        if getattr(modulo, "_fecha_cargado", None) != fecha:
+            if hasattr(modulo, "_fecha_cargado"):
+                importlib.reload(modulo)
+            modulo._fecha_cargado = fecha
+
+
+# turso_adapter primero: db y los demas dependen de el
+for _m in (turso_adapter, db, google_calendar, ui):
+    if not hasattr(_m, "_fecha_cargado"):
+        # primera vez en este proceso tras una actualizacion: recargar por si
+        # el proceso traia una version vieja en memoria
+        importlib.reload(_m)
+        _m._fecha_cargado = os.path.getmtime(_m.__file__)
+_recargar_si_cambio(turso_adapter, db, google_calendar, ui)
 
 # Paleta de las graficas de Estadisticas: azul fuerte / gris claro / blanco.
 # Cancelada y No asistio quedan en tonos muy claros a proposito (pedido del
