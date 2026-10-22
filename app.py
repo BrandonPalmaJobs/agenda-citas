@@ -315,6 +315,19 @@ def _avisar_calendar(cita_id, cliente, servicio_nombre, proveedor_nombre, fecha_
     return error
 
 
+def link_publico():
+    """URL directa con la que agendan los pacientes de ESTE negocio (sin la
+    parte del panel). Se arma con el dominio con el que se abrio la app."""
+    try:
+        host = st.context.headers.get("host") or ""
+    except Exception:
+        host = ""
+    if not host:
+        host = "TU-APP.streamlit.app"
+    esquema = "http" if host.startswith(("localhost", "127.0.0.1")) else "https"
+    return f"{esquema}://{host}/" + (f"?negocio={NEGOCIO_SLUG}" if NEGOCIO_SLUG else "")
+
+
 MESES_NOMBRE = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
                 "septiembre", "octubre", "noviembre", "diciembre"]
 
@@ -590,21 +603,8 @@ pagina = st.sidebar.radio("Menú", paginas, format_func=lambda p: f"{ICONOS_MENU
                           label_visibility="collapsed")
 st.sidebar.divider()
 with st.sidebar.expander(f"Link para que agenden los {V['clientes']}"):
-    if NEGOCIO_SLUG:
-        st.caption(
-            "Esta app atiende varios negocios - comparte la URL con "
-            f"'?negocio={NEGOCIO_SLUG}' pero SIN el '&panel=staff' "
-            "(esa parte es solo para que tu entres aquí). Ejemplo: si el "
-            f"panel vive en .../?negocio={NEGOCIO_SLUG}&panel=staff, el link "
-            f"para {V['clientes']} es .../?negocio={NEGOCIO_SLUG}"
-        )
-    else:
-        st.caption(
-            "Comparte la URL de esta app SIN el '?panel=staff' al final "
-            "(esa parte es solo para que tu entres aquí). Por ejemplo, si "
-            "esto vive en https://mi-negocio.streamlit.app/?panel=staff, "
-            f"el link para {V['clientes']} es https://mi-negocio.streamlit.app/"
-        )
+    st.caption(f"Compártelo por WhatsApp o redes. Copia con el botón de la derecha.")
+    st.code(link_publico(), language=None)
 if st.sidebar.button("Cerrar sesión", use_container_width=True):
     st.session_state.staff_autenticado = False
     st.session_state.rol = None

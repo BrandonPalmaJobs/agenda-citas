@@ -47,7 +47,20 @@ def get_conn():
         conn.close()
 
 
+_BASES_INICIALIZADAS = set()
+
+
 def init_db():
+    """Crea/actualiza las tablas. Solo hace el trabajo la primera vez por
+    base de datos en este proceso (antes corria ~8 consultas en CADA clic)."""
+    clave = turso_adapter.credenciales_turso()[0] or DB_PATH
+    if clave in _BASES_INICIALIZADAS:
+        return
+    _init_db()
+    _BASES_INICIALIZADAS.add(clave)
+
+
+def _init_db():
     with get_conn() as conn:
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS negocio (
@@ -252,9 +265,10 @@ def _minutos_a_hora(minutos):
     return f"{minutos // 60:02d}:{minutos % 60:02d}"
 
 
-def hay_conflicto(proveedor_id, fecha, hora_inicio, hora_fin, excluir_cita_id=None):
-    """True si el proveedor ya tiene una cita (no cancelada) ese dia que se
-    encima con el horario [hora_inicio, hora_fin) que se quiere agendar."""
+def _ocupados(proveedor_id, fecha, excluir_cita_id=None):
+    """Bloques (inicio, fin) en minutos de las citas no canceladas del
+    proveedor ese dia - UNA sola consulta, para luego revisar muchos
+    horarios en memoria."""
     with get_conn() as conn:
         q = """SELECT hora_inicio, hora_fin FROM citas
                WHERE proveedor_id=? AND fecha=? AND estado != 'Cancelada'"""
@@ -263,12 +277,18 @@ def hay_conflicto(proveedor_id, fecha, hora_inicio, hora_fin, excluir_cita_id=No
             q += " AND id != ?"
             params.append(excluir_cita_id)
         existentes = conn.execute(q, params).fetchall()
-    nuevo_ini, nuevo_fin = _hora_a_minutos(hora_inicio), _hora_a_minutos(hora_fin)
-    for e in existentes:
-        e_ini, e_fin = _hora_a_minutos(e["hora_inicio"]), _hora_a_minutos(e["hora_fin"])
-        if nuevo_ini < e_fin and nuevo_fin > e_ini:
-            return True
-    return False
+    return [(_hora_a_minutos(e["hora_inicio"]), _hora_a_minutos(e["hora_fin"])) for e in existentes]
+
+
+def _choca(ocupados, hora_inicio, hora_fin):
+    ini, fin = _hora_a_minutos(hora_inicio), _hora_a_minutos(hora_fin)
+    return any(ini < e_fin and fin > e_ini for e_ini, e_fin in ocupados)
+
+
+def hay_conflicto(proveedor_id, fecha, hora_inicio, hora_fin, excluir_cita_id=None):
+    """True si el proveedor ya tiene una cita (no cancelada) ese dia que se
+    encima con el horario [hora_inicio, hora_fin) que se quiere agendar."""
+    return _choca(_ocupados(proveedor_id, fecha, excluir_cita_id), hora_inicio, hora_fin)
 
 
 def agendar_cita(cliente_id, proveedor_id, servicio_id, fecha, hora_inicio, duracion_min, notas=""):
@@ -297,12 +317,9 @@ def horarios_disponibles(proveedor_id, fecha, duracion_min, horarios):
     chocan con una cita existente (no cancelada) del proveedor ese dia.
     Se usa tanto para que el negocio agende como para que el cliente se
     autoagende, asi ambos ven exactamente lo mismo disponible."""
-    disponibles = []
-    for h in horarios:
-        h_fin = _minutos_a_hora(_hora_a_minutos(h) + duracion_min)
-        if not hay_conflicto(proveedor_id, fecha, h, h_fin):
-            disponibles.append(h)
-    return disponibles
+    ocupados = _ocupados(proveedor_id, fecha)
+    return [h for h in horarios
+            if not _choca(ocupados, h, _minutos_a_hora(_hora_a_minutos(h) + duracion_min))]
 
 
 def citas_finalizadas(fecha_inicio=None, fecha_fin=None):

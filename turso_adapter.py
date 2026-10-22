@@ -59,6 +59,21 @@ class TursoError(RuntimeError):
     pass
 
 
+def _sesion_reutilizable(url, token):
+    """Una sesion HTTP por hilo y por base de datos, que se reutiliza: abrir
+    una conexion HTTPS nueva en cada consulta (handshake TLS incluido) era lo
+    que mas tardaba. Por hilo para no mezclar negocios entre sesiones."""
+    sesiones = getattr(_local, "sesiones", None)
+    if sesiones is None:
+        sesiones = _local.sesiones = {}
+    clave = (url, token)
+    if clave not in sesiones:
+        s = requests.Session()
+        s.headers.update({"Authorization": f"Bearer {token}"})
+        sesiones[clave] = s
+    return sesiones[clave]
+
+
 def _codificar_valor(v):
     if v is None:
         return {"type": "null"}
@@ -149,8 +164,7 @@ class TursoConn:
 
     def __init__(self, url, auth_token):
         self._base_url = url.replace("libsql://", "https://", 1).rstrip("/") + "/"
-        self._session = requests.Session()
-        self._session.headers.update({"Authorization": f"Bearer {auth_token}"})
+        self._session = _sesion_reutilizable(url, auth_token)
 
     def execute(self, sql, params=None):
         stmt = {
@@ -173,4 +187,4 @@ class TursoConn:
         pass  # cada execute() ya aplica de inmediato via HTTP, no hay transaccion pendiente
 
     def close(self):
-        self._session.close()
+        pass  # la sesion se reutiliza entre consultas (ver _sesion_reutilizable)
