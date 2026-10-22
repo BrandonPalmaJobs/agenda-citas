@@ -151,7 +151,8 @@ def pagina(hoy, url_base):
     en_prueba = [f for f in ok if f[4]["plan"] == "prueba" and not f[4]["bloqueado"]]
     activas = [f for f in ok if f[4]["plan"] == "activa" and not f[4]["bloqueado"]]
     bloqueadas = [f for f in ok if f[4]["bloqueado"]]
-    ingreso = sum((f[2].get("precio_mensual") or 0) for f in activas)
+    ingreso = sum((f[2].get("precio_mensual")
+                   or suscripcion.NIVELES.get(f[2].get("nivel") or "basico", (0, 0))[1]) for f in activas)
     ui.kpis([
         ("🏥", "Clínicas", len(filas), ui.TEAL_CLARO, ui.TEAL),
         ("🧪", "En prueba", len(en_prueba), "#EEF2FF", "#4338CA"),
@@ -213,7 +214,11 @@ def _tarjeta_clinica(slug, datos, negocio, resumen, est, hoy, url_base):
         vence_txt = f"{est['vence'].strftime('%d/%m/%Y')} · {cuando}"
     else:
         vence_txt = "sin vencimiento"
-    precio = negocio.get("precio_mensual")
+    nivel = negocio.get("nivel") or suscripcion.NIVEL_PREDETERMINADO
+    nombre_nivel, precio_nivel, maximo = suscripcion.NIVELES.get(nivel, suscripcion.NIVELES["basico"])
+    precio = negocio.get("precio_mensual") or precio_nivel
+    pac_mes = resumen.get("pacientes_mes", 0)
+    nivel_ok = suscripcion.nivel_para(pac_mes)
     if datos.get("url_app"):  # clinica con su propia app (opcion B)
         link_pacientes = datos["url_app"].rstrip("/") + "/"
         link_panel = link_pacientes + "?panel=staff"
@@ -223,10 +228,18 @@ def _tarjeta_clinica(slug, datos, negocio, resumen, est, hoy, url_base):
     st.markdown(
         f'<div class="ak-cita-hora">{ui.escapar(negocio["nombre"])} &nbsp;{chip}</div>'
         f'<div class="ak-cita-linea">{ui.escapar(negocio["tipo"])} · <code>{ui.escapar(slug)}</code> · '
-        f'Vencimiento: <b>{vence_txt}</b> · Precio: <b>{f"${precio:,.0f}/mes" if precio else "—"}</b></div>'
-        f'<div class="ak-cita-linea">Pacientes: <b>{resumen["pacientes"]}</b> · Citas este mes: '
-        f'<b>{resumen["citas_mes"]}</b> · Citas totales: <b>{resumen["citas_total"]}</b></div>',
+        f'Vencimiento: <b>{vence_txt}</b></div>'
+        f'<div class="ak-cita-linea">Plan <b>{nombre_nivel}</b> · <b>${precio:,.0f}/mes</b> · '
+        f'Pacientes este mes: <b>{pac_mes} de {maximo}</b> · Citas este mes: <b>{resumen["citas_mes"]}</b> · '
+        f'Pacientes registrados: <b>{resumen["pacientes"]}</b></div>',
         unsafe_allow_html=True)
+    if est["plan"] != "demo" and pac_mes > maximo:
+        if nivel_ok:
+            n2, p2, m2 = suscripcion.NIVELES[nivel_ok]
+            st.warning(f"⬆️ Rebasó su plan: {pac_mes} pacientes este mes (su plan {nombre_nivel} cubre {maximo}). "
+                       f"Le corresponde **{n2}** (${p2}/mes).")
+        else:
+            st.warning(f"⬆️ {pac_mes} pacientes este mes: pasa de 200, le corresponde **cotización especial**.")
 
     with st.expander("Administrar"):
         st.markdown(f"Link de pacientes: {link_pacientes}  \nPanel: {link_panel}")
@@ -252,18 +265,27 @@ def _tarjeta_clinica(slug, datos, negocio, resumen, est, hoy, url_base):
                 st.rerun()
 
             with st.form(f"form_admin_{slug}"):
+                niveles = list(suscripcion.NIVELES.keys())
+                nivel_e = st.selectbox("Nivel del plan", niveles, format_func=suscripcion.etiqueta_nivel,
+                                       index=niveles.index(nivel) if nivel in niveles else 0,
+                                       help="Al guardar, el precio se pone solo según el nivel "
+                                            "(si quieres otro precio, escríbelo abajo y marca la casilla).")
                 f1, f2, f3 = st.columns(3)
                 planes = ["prueba", "activa", "suspendida", "demo"]
                 plan_e = f1.selectbox("Plan", planes, format_func=suscripcion.etiqueta_plan,
                                       index=planes.index(est["plan"]) if est["plan"] in planes else 0)
                 vence_e = f2.date_input("Vence el", value=est["vence"] or hoy + timedelta(days=14),
                                         format="DD/MM/YYYY")
-                precio_e = f3.number_input("Precio mensual (MXN)", min_value=0.0, step=50.0,
-                                           value=float(precio or 500))
+                precio_e = f3.number_input("Precio especial (MXN)", min_value=0.0, step=50.0,
+                                           value=float(precio or precio_nivel))
+                especial = st.checkbox("Usar el precio especial (descuento o cotización)",
+                                       value=bool(negocio.get("precio_mensual"))
+                                       and negocio.get("precio_mensual") != precio_nivel)
                 notas_e = st.text_input("Notas internas (solo tú las ves)", value=negocio.get("notas_admin") or "")
                 if st.form_submit_button("Guardar cambios", use_container_width=True):
-                    db.set_suscripcion(plan=plan_e, vence_el=vence_e.isoformat(),
-                                       precio_mensual=precio_e, notas_admin=notas_e)
+                    precio_final = precio_e if especial else suscripcion.NIVELES[nivel_e][1]
+                    db.set_suscripcion(plan=plan_e, vence_el=vence_e.isoformat(), nivel=nivel_e,
+                                       precio_mensual=precio_final, notas_admin=notas_e)
                     st.success("Guardado.")
                     st.rerun()
         finally:

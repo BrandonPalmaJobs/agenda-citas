@@ -148,7 +148,7 @@ def _init_db():
         # Suscripcion (la administra Aika Solutions desde su panel):
         #   plan: 'demo' | 'prueba' | 'activa' | 'suspendida' (vacio = sin vencimiento)
         #   vence_el: 'YYYY-MM-DD' - desde el dia siguiente la agenda se bloquea
-        for columna, tipo in [("plan", "TEXT"), ("vence_el", "TEXT"), ("precio_mensual", "REAL"),
+        for columna, tipo in [("plan", "TEXT"), ("nivel", "TEXT"), ("vence_el", "TEXT"), ("precio_mensual", "REAL"),
                               ("alta_el", "TEXT"), ("notas_admin", "TEXT")]:
             if columna not in columnas_negocio:
                 conn.execute(f"ALTER TABLE negocio ADD COLUMN {columna} {tipo}")
@@ -228,10 +228,11 @@ def set_logo(logo_base64):
     limpiar_cache()
 
 
-def set_suscripcion(plan=None, vence_el=None, precio_mensual=None, notas_admin=None, alta_el=None):
+def set_suscripcion(plan=None, vence_el=None, precio_mensual=None, notas_admin=None, alta_el=None,
+                    nivel=None):
     """Cambia solo los campos que se pasan (los None se dejan como estan)."""
     campos = {"plan": plan, "vence_el": vence_el, "precio_mensual": precio_mensual,
-              "notas_admin": notas_admin, "alta_el": alta_el}
+              "notas_admin": notas_admin, "alta_el": alta_el, "nivel": nivel}
     campos = {k: v for k, v in campos.items() if v is not None}
     if not campos:
         return
@@ -252,8 +253,11 @@ def resumen_admin(desde_iso, hasta_iso):
             (desde_iso, hasta_iso)).fetchone()[0]
         citas_total = conn.execute("SELECT COUNT(*) FROM citas").fetchone()[0]
         ultima = conn.execute("SELECT MAX(creada_el) FROM citas").fetchone()[0]
+        pacientes_mes = conn.execute(
+            "SELECT COUNT(DISTINCT cliente_id) FROM citas WHERE fecha BETWEEN ? AND ? AND estado != 'Cancelada'",
+            (desde_iso, hasta_iso)).fetchone()[0]
     return {"pacientes": pacientes, "citas_mes": citas_mes, "citas_total": citas_total,
-            "ultima_cita_creada": ultima}
+            "ultima_cita_creada": ultima, "pacientes_mes": pacientes_mes}
 
 
 def set_color(color_hex):

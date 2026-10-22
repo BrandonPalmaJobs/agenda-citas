@@ -20,6 +20,30 @@ PLANES = {
     "suspendida": "Suspendida",
 }
 DIAS_PRUEBA = 14
+
+# Niveles de suscripcion: clave -> (nombre, precio MXN/mes, maximo de pacientes al mes)
+# "Pacientes al mes" = pacientes distintos con al menos una cita (no cancelada) en el mes.
+NIVELES = {
+    "basico": ("Básico", 499, 50),
+    "plus": ("Plus", 549, 100),
+    "pro": ("Pro", 599, 200),
+}
+NIVEL_PREDETERMINADO = "basico"
+
+
+def nivel_para(pacientes_mes):
+    """El nivel que le corresponde por cantidad de pacientes (None = mas de 200: cotizar)."""
+    for clave, (_n, _p, maximo) in NIVELES.items():
+        if pacientes_mes <= maximo:
+            return clave
+    return None
+
+
+def etiqueta_nivel(clave):
+    if clave in NIVELES:
+        nombre, precio, maximo = NIVELES[clave]
+        return f"{nombre} · ${precio}/mes · hasta {maximo} pacientes"
+    return "Cotización especial (más de 200 pacientes)"
 DIAS_AVISO = 5  # desde cuantos dias antes se le avisa al negocio en su panel
 
 

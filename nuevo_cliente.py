@@ -170,7 +170,12 @@ def main():
             print("  No encontre ese archivo; se da de alta sin logo (lo pueden subir desde su panel).")
 
     dias = int(preguntar("Dias de prueba gratis", str(suscripcion.DIAS_PRUEBA)))
-    precio = float(preguntar("Precio mensual que le vas a cobrar (MXN)", "500"))
+    print("Plan:")
+    niveles = list(suscripcion.NIVELES.keys())
+    for i, k in enumerate(niveles, 1):
+        print(f"  {i}. {suscripcion.etiqueta_nivel(k)}")
+    nivel = niveles[int(preguntar("Elige el numero", "1")) - 1]
+    precio = float(suscripcion.NIVELES[nivel][1])
 
     # ---- Base de datos
     print("\nCreando su base de datos en Turso...")
@@ -199,7 +204,7 @@ def main():
     hoy = date.today()
     vence = hoy + timedelta(days=dias)
     db.set_suscripcion(plan="prueba", vence_el=vence.isoformat(), precio_mensual=precio,
-                       alta_el=hoy.isoformat())
+                       alta_el=hoy.isoformat(), nivel=nivel)
 
     clave_staff = clave_nueva("staff")
     clave_dueno = clave_nueva("dueno")
@@ -241,7 +246,7 @@ def main():
     ficha = (
         f"{nombre} ({tipo})\n"
         f"Alta: {hoy.strftime('%d/%m/%Y')} · Prueba gratis hasta: {vence.strftime('%d/%m/%Y')} · "
-        f"Precio: ${precio:,.0f}/mes\n\n"
+        f"Plan {suscripcion.NIVELES[nivel][0]}: ${precio:,.0f}/mes\n\n"
         f"Link para sus pacientes:  {url_app_clinica}\n"
         f"Panel (personal y dueño): {url_app_clinica}?panel=staff\n"
         f"Contraseña personal:      {clave_staff}\n"
