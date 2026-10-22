@@ -42,8 +42,8 @@ CONTORNO = "#a9a89f"
 COLOR_ESTADO = {"Completada": AZUL_FUERTE, "Cancelada": GRIS_CLARO, "No asistio": BLANCO}
 
 DIAS_NOMBRE = {
-    "Lun": "lunes", "Mar": "martes", "Mie": "miercoles", "Jue": "jueves",
-    "Vie": "viernes", "Sab": "sabado", "Dom": "domingo",
+    "Lun": "lunes", "Mar": "martes", "Mie": "miércoles", "Jue": "jueves",
+    "Vie": "viernes", "Sab": "sábado", "Dom": "domingo",
 }
 
 # Una cuenta gratuita de Streamlit Cloud solo permite una app - para atender
@@ -107,28 +107,28 @@ else:
 VOCABULARIO = {
     "Consultorio dental": {
         "cliente": "paciente", "clientes": "pacientes", "Cliente": "Paciente", "Clientes": "Pacientes",
-        "icono": "🦷", "icono_personal": "🧑‍⚕️", "con_quien": "Con que doctor(a)",
-        "personal_desc": "Dentistas, higienistas y asistentes - quien atiende las citas.",
-        "ejemplos_servicios": "Ej. 'Valoracion' (30 min), 'Limpieza dental' (45 min), 'Resina' (60 min).",
+        "icono": "🦷", "icono_personal": "🧑‍⚕️", "con_quien": "¿Con qué doctor(a)?",
+        "personal_desc": "Dentistas, higienistas y asistentes - quién atiende las citas.",
+        "ejemplos_servicios": "Ej. 'Valoración' (30 min), 'Limpieza dental' (45 min), 'Resina' (60 min).",
     },
     "Consultorio medico": {
         "cliente": "paciente", "clientes": "pacientes", "Cliente": "Paciente", "Clientes": "Pacientes",
-        "icono": "🩺", "icono_personal": "🧑‍⚕️", "con_quien": "Con que doctor(a)",
-        "personal_desc": "Doctores, enfermeras y asistentes - quien atiende las citas.",
-        "ejemplos_servicios": "Ej. 'Consulta general' (30 min), 'Revision de estudios' (20 min).",
+        "icono": "🩺", "icono_personal": "🧑‍⚕️", "con_quien": "¿Con qué doctor(a)?",
+        "personal_desc": "Doctores, enfermeras y asistentes - quién atiende las citas.",
+        "ejemplos_servicios": "Ej. 'Consulta general' (30 min), 'Revisión de estudios' (20 min).",
     },
     "Barberia": {
         "cliente": "cliente", "clientes": "clientes", "Cliente": "Cliente", "Clientes": "Clientes",
-        "icono": "💈", "icono_personal": "💈", "con_quien": "Con quien",
-        "personal_desc": "Barberos y estilistas - quien atiende las citas.",
+        "icono": "💈", "icono_personal": "💈", "con_quien": "¿Con quién?",
+        "personal_desc": "Barberos y estilistas - quién atiende las citas.",
         "ejemplos_servicios": "Ej. 'Corte de cabello' (30 min), 'Corte y barba' (60 min).",
     },
 }
 VOCABULARIO_GENERICO = {
     "cliente": "cliente", "clientes": "clientes", "Cliente": "Cliente", "Clientes": "Clientes",
-    "icono": "📅", "icono_personal": "👤", "con_quien": "Con quien",
+    "icono": "📅", "icono_personal": "👤", "con_quien": "¿Con quién?",
     "personal_desc": "Las personas que atienden las citas.",
-    "ejemplos_servicios": "Ej. 'Consulta' (30 min), 'Sesion' (60 min).",
+    "ejemplos_servicios": "Ej. 'Consulta' (30 min), 'Sesión' (60 min).",
 }
 V = VOCABULARIO.get((negocio or {}).get("tipo"), VOCABULARIO_GENERICO)
 
@@ -147,14 +147,14 @@ st.set_page_config(page_title=negocio["nombre"] if negocio else "Aika Solutions"
                    page_icon=_icono_pagina, layout="wide")
 
 if _negocio_no_configurado:
-    st.error(f"No encontramos configuracion para el negocio '{NEGOCIO_SLUG}'. Revisa el link.")
+    st.error(f"No encontramos configuración para el negocio '{NEGOCIO_SLUG}'. Revisa el link.")
     st.stop()
 
 if _es_raiz_de_plataforma:
     st.title("Aika Solutions")
-    st.subheader("Agenda de citas en linea para consultorios y negocios de servicio")
+    st.subheader("Agenda de citas en línea para consultorios y negocios de servicio")
     st.write(
-        "Si te compartieron el link de tu clinica o negocio para agendar, revisa que "
+        "Si te compartieron el link de tu clínica o negocio para agendar, revisa que "
         "este completo: debe terminar en algo como `?negocio=nombre-del-negocio`."
     )
     st.stop()
@@ -313,7 +313,7 @@ def pagina_reservar_publica():
     proveedores = db.list_proveedores(solo_activos=True)
 
     if not servicios or not proveedores:
-        st.info("Este negocio todavia no tiene la agenda configurada. Intenta mas tarde.")
+        st.info("Este negocio todavía no tiene la agenda configurada. Intenta más tarde.")
         return
 
     servicio_id = st.selectbox(
@@ -338,11 +338,11 @@ def pagina_reservar_publica():
                 break
         st.warning(
             f"El {fecha_sel.strftime('%d/%m/%Y')} "
-            f"({DIAS_NOMBRE.get(db.DIAS_SEMANA[fecha_sel.weekday()], '')}) el negocio esta cerrado. "
+            f"({DIAS_NOMBRE.get(db.DIAS_SEMANA[fecha_sel.weekday()], '')}) el negocio está cerrado. "
             f"Atendemos: {dias_abiertos}."
         )
         st.button(
-            f"Usar el proximo dia disponible ({siguiente.strftime('%d/%m/%Y')})",
+            f"Usar el próximo día disponible ({siguiente.strftime('%d/%m/%Y')})",
             on_click=lambda: st.session_state.update(fecha_reserva_publica=siguiente),
         )
         return
@@ -360,7 +360,7 @@ def pagina_reservar_publica():
         disponibles = db.horarios_disponibles(proveedor_sel, fecha_sel.isoformat(), duracion, horarios_base)
 
     if not disponibles:
-        st.warning("No hay horarios disponibles ese dia para esa opcion. Prueba otra fecha, servicio o proveedor.")
+        st.warning("No hay horarios disponibles ese día para esa opción. Prueba otra fecha, servicio o proveedor.")
         return
 
     st.write("Hora disponible")
@@ -381,35 +381,45 @@ def pagina_reservar_publica():
             st.error("Ese horario se acaba de ocupar, por favor elige otro.")
             return
         st.success(
-            f"Listo, {cliente['nombre']}. Tu cita quedo agendada para el "
+            f"Listo, {cliente['nombre']}. Tu cita quedó agendada para el "
             f"{fecha_sel.strftime('%d/%m/%Y')} a las {hora_sel}."
         )
         error_calendar = _avisar_calendar(
             cita_id, cliente, servicio_nombre, proveedor_nombre,
             fecha_sel.isoformat(), hora_sel, duracion, notas)
         if error_calendar:
-            st.caption(f"(La cita quedo guardada. No se pudo mandar la invitacion de Google Calendar: {error_calendar})")
+            st.caption(f"(La cita quedó guardada. No se pudo mandar la invitación de Google Calendar: {error_calendar})")
 
     st.divider()
     st.subheader("Tus datos")
-    modo = st.radio("¿Ya has agendado con nosotros antes?", [f"No, soy {V['cliente']} nuevo", f"Si, ya soy {V['cliente']}"],
+    modo = st.radio("¿Ya has agendado con nosotros antes?", [f"No, soy {V['cliente']} nuevo", f"Sí, ya soy {V['cliente']}"],
                      horizontal=True)
 
-    if modo == f"Si, ya soy {V['cliente']}":
-        busqueda = st.text_input("Escribe tu nombre, telefono o correo para encontrarte")
+    if modo == f"Sí, ya soy {V['cliente']}":
+        # Solo coincidencia EXACTA de telefono o correo (nunca por nombre ni por
+        # pedazos): asi nadie puede escribir "a" y ver la lista de pacientes.
+        # Y lo unico que se muestra de quien se encontro es su nombre
+        # enmascarado - nunca telefonos ni correos.
+        busqueda = st.text_input("Escribe tu teléfono (10 dígitos) o el correo con el que te registraste")
         cliente_sel = None
-        if busqueda.strip():
-            encontrados = db.buscar_clientes(busqueda.strip())
-            if not encontrados:
-                st.warning("No encontramos a nadie con ese dato. Revisa que este bien escrito, "
+        termino = busqueda.strip()
+        if termino:
+            if "@" not in termino and not telefono_valido(termino):
+                st.warning("Escribe tu teléfono completo (10 dígitos, solo números) o tu correo.")
+                encontrados = None
+            else:
+                encontrados = db.buscar_cliente_exacto(termino)
+            if encontrados is None:
+                pass
+            elif not encontrados:
+                st.warning("No encontramos a nadie con ese dato. Revisa que esté bien escrito, "
                            f"o elige '{V['Cliente']} nuevo' para registrarte.")
             elif len(encontrados) == 1:
                 cliente_sel = encontrados[0]
                 st.success(f"Hola de nuevo, {enmascarar_nombre(cliente_sel['nombre'])}.")
             else:
-                opciones = {c["id"]: f"{enmascarar_nombre(c['nombre'])} - {c['telefono'] or c['email'] or 'sin datos'}"
-                            for c in encontrados}
-                cid = st.selectbox("Encontramos varios - ¿cual eres?", options=list(opciones.keys()),
+                opciones = {c["id"]: enmascarar_nombre(c["nombre"]) for c in encontrados}
+                cid = st.selectbox("Hay varios registros con ese dato - ¿cuál eres?", options=list(opciones.keys()),
                                     format_func=lambda cid: opciones[cid])
                 cliente_sel = next(c for c in encontrados if c["id"] == cid)
 
@@ -420,23 +430,27 @@ def pagina_reservar_publica():
         with st.form("form_reservar_publico"):
             c1, c2 = st.columns(2)
             nombre = c1.text_input("Nombre completo")
-            telefono = c2.text_input("Telefono")
-            email = st.text_input("Email (opcional - si lo dejas, te mandamos invitacion y recordatorio)")
+            telefono = c2.text_input("Teléfono")
+            email = st.text_input("Email (opcional - si lo dejas, te mandamos invitación y recordatorio)")
             notas = st.text_area("Algo que debamos saber (opcional)")
 
             if st.form_submit_button("Confirmar cita"):
                 if not nombre.strip() or not telefono.strip():
-                    st.error("Nombre y telefono son obligatorios.")
+                    st.error("Nombre y teléfono son obligatorios.")
                 elif not telefono_valido(telefono):
-                    st.error("El telefono debe tener 10 digitos (solo numeros, sin espacios ni guiones).")
+                    st.error("El teléfono debe tener 10 dígitos (solo números, sin espacios ni guiones).")
                 else:
-                    cliente_existente = db.find_cliente_por_telefono(telefono.strip())
-                    if cliente_existente:
-                        cliente = cliente_existente
+                    # Si el telefono ya esta registrado no se agenda a nombre de
+                    # otra persona en silencio: se le pide que entre como
+                    # registrado (asi tampoco se revela de quien es ese numero).
+                    if db.find_cliente_por_telefono(telefono.strip()):
+                        st.warning(
+                            "Ese teléfono ya está registrado. Elige "
+                            f"'Sí, ya soy {V['cliente']}' arriba y búscate con tu teléfono.")
                     else:
                         cliente_id = db.add_cliente(nombre.strip(), telefono.strip(), email.strip(), "")
                         cliente = {"id": cliente_id, "nombre": nombre.strip(), "email": email.strip()}
-                    _confirmar(cliente, notas)
+                        _confirmar(cliente, notas)
 
 
 # ---------------------------------------------------------------- Ruteo: publico vs panel del negocio
@@ -457,7 +471,7 @@ if not st.session_state.staff_autenticado:
         clave_staff = _secreto("staff_password")
         if clave_dueno and clave == clave_dueno:
             st.session_state.staff_autenticado = True
-            st.session_state.rol = "dueno"
+            st.session_state.rol = "dueño"
             st.rerun()
         elif clave_staff and clave == clave_staff:
             st.session_state.staff_autenticado = True
@@ -481,27 +495,27 @@ with st.sidebar.expander(f"Link para que agenden los {V['clientes']}"):
         st.caption(
             "Esta app atiende varios negocios - comparte la URL con "
             f"'?negocio={NEGOCIO_SLUG}' pero SIN el '&panel=staff' "
-            "(esa parte es solo para que tu entres aqui). Ejemplo: si el "
+            "(esa parte es solo para que tu entres aquí). Ejemplo: si el "
             f"panel vive en .../?negocio={NEGOCIO_SLUG}&panel=staff, el link "
             f"para {V['clientes']} es .../?negocio={NEGOCIO_SLUG}"
         )
     else:
         st.caption(
             "Comparte la URL de esta app SIN el '?panel=staff' al final "
-            "(esa parte es solo para que tu entres aqui). Por ejemplo, si "
+            "(esa parte es solo para que tu entres aquí). Por ejemplo, si "
             "esto vive en https://mi-negocio.streamlit.app/?panel=staff, "
             f"el link para {V['clientes']} es https://mi-negocio.streamlit.app/"
         )
 
-paginas = ["Agenda del dia", "Nueva cita", V["Clientes"], "Servicios", "Personal", "Configuracion"]
-if st.session_state.rol == "dueno":
-    paginas.append("Estadisticas")
+paginas = ["Agenda del día", "Nueva cita", V["Clientes"], "Servicios", "Personal", "Configuración"]
+if st.session_state.rol == "dueño":
+    paginas.append("Estadísticas")
 pagina = st.sidebar.radio("Ir a:", paginas)
 
 
 # ---------------------------------------------------------------- Agenda del dia
-if pagina == "Agenda del dia":
-    st.title(f"{V['icono']} Agenda del dia")
+if pagina == "Agenda del día":
+    st.title(f"{V['icono']} Agenda del día")
 
     col1, col2 = st.columns([1, 2])
     with col1:
@@ -525,13 +539,13 @@ if pagina == "Agenda del dia":
         st.session_state.editando_cita = None
 
     if not citas:
-        st.info("No hay citas agendadas para este dia (con este filtro).")
+        st.info("No hay citas agendadas para este día (con este filtro).")
     for c in citas:
         with st.container(border=True):
             c1, c2, c3 = st.columns([2, 2, 1])
             with c1:
                 st.markdown(f"**{c['hora_inicio']} - {c['hora_fin']}**  {etiqueta_estado(c['estado'])} {c['estado']}")
-                st.write(f"{V['Cliente']}: {c['cliente_nombre']} ({c['cliente_telefono'] or 'sin telefono'})")
+                st.write(f"{V['Cliente']}: {c['cliente_nombre']} ({c['cliente_telefono'] or 'sin teléfono'})")
             with c2:
                 st.write(f"Servicio: {c['servicio_nombre']}")
                 st.write(f"Con: {c['proveedor_nombre']}")
@@ -581,7 +595,7 @@ if pagina == "Agenda del dia":
 
                     g1, g2 = st.columns(2)
                     guardar = g1.form_submit_button("Guardar cambios")
-                    cancelar_edicion = g2.form_submit_button("Cancelar edicion")
+                    cancelar_edicion = g2.form_submit_button("Cancelar edición")
 
                     if guardar:
                         duracion = next(s["duracion_min"] for s in todos_servicios if s["id"] == servicio_id_e)
@@ -610,25 +624,25 @@ elif pagina == "Nueva cita":
     elif not proveedores:
         st.warning("Primero agrega al menos una persona en la pagina 'Personal'.")
     else:
-        with st.expander(f"¿{V['Cliente']} nuevo? Agregalo aqui primero"):
+        with st.expander(f"¿{V['Cliente']} nuevo? Agrégalo aquí primero"):
             with st.form("form_cliente_rapido"):
                 nc1, nc2 = st.columns(2)
                 nombre_nuevo = nc1.text_input(f"Nombre del {V['cliente']}")
-                telefono_nuevo = nc2.text_input("Telefono")
-                email_nuevo = st.text_input("Correo (opcional - si lo pones, se le manda invitacion de Calendar)")
+                telefono_nuevo = nc2.text_input("Teléfono")
+                email_nuevo = st.text_input("Correo (opcional - si lo pones, se le manda invitación de Calendar)")
                 if st.form_submit_button(f"Guardar {V['cliente']}"):
                     if not nombre_nuevo.strip():
                         st.error(f"Ponle un nombre al {V['cliente']}.")
                     elif telefono_nuevo.strip() and not telefono_valido(telefono_nuevo):
-                        st.error("El telefono debe tener 10 digitos (solo numeros, sin espacios ni guiones).")
+                        st.error("El teléfono debe tener 10 dígitos (solo números, sin espacios ni guiones).")
                     else:
                         db.add_cliente(nombre_nuevo.strip(), telefono_nuevo.strip(), email_nuevo.strip(), "")
-                        st.success(f"{V['Cliente']} '{nombre_nuevo}' agregado. Ya deberia aparecer en la lista de abajo.")
+                        st.success(f"{V['Cliente']} '{nombre_nuevo}' agregado. Ya debería aparecer en la lista de abajo.")
                         st.rerun()
 
         clientes = db.list_clientes()
         if not clientes:
-            st.info(f"Todavia no hay {V['clientes']} registrados. Agrega uno arriba.")
+            st.info(f"Todavía no hay {V['clientes']} registrados. Agrega uno arriba.")
         else:
             servicio_id = st.selectbox("Servicio", options=[s["id"] for s in servicios],
                                         format_func=lambda sid: next(
@@ -667,7 +681,7 @@ elif pagina == "Nueva cita":
                                 cita_id, cliente_sel, servicio_nombre, proveedor_nombre,
                                 fecha_cita.isoformat(), hora_cita, duracion, notas)
                             if error_calendar:
-                                st.caption(f"(No se pudo mandar la invitacion de Google Calendar: {error_calendar})")
+                                st.caption(f"(No se pudo mandar la invitación de Google Calendar: {error_calendar})")
                         except ValueError as e:
                             st.error(str(e))
 
@@ -679,33 +693,33 @@ elif pagina == V["Clientes"]:
         with st.form("form_nuevo_cliente"):
             c1, c2 = st.columns(2)
             nombre = c1.text_input("Nombre")
-            telefono = c2.text_input("Telefono")
-            email = st.text_input("Correo (opcional - si lo pones, se le manda invitacion de Calendar)")
+            telefono = c2.text_input("Teléfono")
+            email = st.text_input("Correo (opcional - si lo pones, se le manda invitación de Calendar)")
             notas = st.text_area("Notas (opcional)")
             if st.form_submit_button("Guardar"):
                 if not nombre.strip():
                     st.error(f"Ponle un nombre al {V['cliente']}.")
                 elif telefono.strip() and not telefono_valido(telefono):
-                    st.error("El telefono debe tener 10 digitos (solo numeros, sin espacios ni guiones).")
+                    st.error("El teléfono debe tener 10 dígitos (solo números, sin espacios ni guiones).")
                 else:
                     db.add_cliente(nombre.strip(), telefono.strip(), email.strip(), notas.strip())
                     st.success(f"{V['Cliente']} agregado.")
                     st.rerun()
 
-    busqueda = st.text_input("Buscar por nombre o telefono")
+    busqueda = st.text_input("Buscar por nombre o teléfono")
     clientes = db.list_clientes(busqueda or None)
     st.caption(f"{len(clientes)} {V['cliente']}(s)")
     for cl in clientes:
-        with st.expander(f"{cl['nombre']} - {cl['telefono'] or 'sin telefono'}"):
+        with st.expander(f"{cl['nombre']} - {cl['telefono'] or 'sin teléfono'}"):
             with st.form(f"form_editar_cliente_{cl['id']}"):
                 c1, c2 = st.columns(2)
                 nombre_e = c1.text_input("Nombre", value=cl["nombre"], key=f"nom_{cl['id']}")
-                telefono_e = c2.text_input("Telefono", value=cl["telefono"] or "", key=f"tel_{cl['id']}")
+                telefono_e = c2.text_input("Teléfono", value=cl["telefono"] or "", key=f"tel_{cl['id']}")
                 email_e = st.text_input("Email", value=cl["email"] or "", key=f"mail_{cl['id']}")
                 notas_e = st.text_area("Notas", value=cl["notas"] or "", key=f"notas_{cl['id']}")
                 if st.form_submit_button("Guardar cambios"):
                     if telefono_e.strip() and not telefono_valido(telefono_e):
-                        st.error("El telefono debe tener 10 digitos (solo numeros, sin espacios ni guiones).")
+                        st.error("El teléfono debe tener 10 dígitos (solo números, sin espacios ni guiones).")
                     else:
                         db.update_cliente(cl["id"], nombre_e.strip(), telefono_e.strip(), email_e.strip(), notas_e.strip())
                         st.success("Actualizado.")
@@ -720,7 +734,7 @@ elif pagina == "Servicios":
         with st.form("form_nuevo_servicio"):
             c1, c2, c3 = st.columns(3)
             nombre = c1.text_input("Nombre del servicio")
-            duracion = c2.number_input("Duracion (minutos)", min_value=5, step=5, value=30)
+            duracion = c2.number_input("Duración (minutos)", min_value=5, step=5, value=30)
             precio = c3.number_input("Precio (opcional)", min_value=0.0, step=0.5, value=0.0)
             if st.form_submit_button("Guardar"):
                 if nombre.strip():
@@ -735,7 +749,7 @@ elif pagina == "Servicios":
             with st.form(f"form_editar_servicio_{s['id']}"):
                 c1, c2, c3 = st.columns(3)
                 nombre_e = c1.text_input("Nombre", value=s["nombre"], key=f"snom_{s['id']}")
-                duracion_e = c2.number_input("Duracion (min)", min_value=5, step=5, value=s["duracion_min"], key=f"sdur_{s['id']}")
+                duracion_e = c2.number_input("Duración (min)", min_value=5, step=5, value=s["duracion_min"], key=f"sdur_{s['id']}")
                 precio_e = c3.number_input("Precio", min_value=0.0, step=0.5, value=s["precio"] or 0.0, key=f"sprecio_{s['id']}")
                 activo_e = st.checkbox("Activo (aparece al agendar)", value=bool(s["activo"]), key=f"sact_{s['id']}")
                 if st.form_submit_button("Guardar cambios"):
@@ -774,8 +788,8 @@ elif pagina == "Personal":
                     st.rerun()
 
 # ---------------------------------------------------------------- Configuracion
-elif pagina == "Configuracion":
-    st.title("⚙️ Configuracion del negocio")
+elif pagina == "Configuración":
+    st.title("⚙️ Configuración del negocio")
 
     st.subheader("Logo")
     mostrar_logo(negocio, ancho=160)
@@ -796,7 +810,7 @@ elif pagina == "Configuracion":
     # vuelven a correr el script hasta que se manda el formulario, asi que
     # el checkbox no podia des-bloquear los campos de abajo en vivo.
     tiene_descanso = st.checkbox(
-        "¿Cierran para comer o tienen un bloque no disponible a medio dia?",
+        "¿Cierran para comer o tienen un bloque no disponible a medio día?",
         value=bool(negocio.get("descanso_inicio")), key="config_tiene_descanso")
 
     with st.form("form_config"):
@@ -809,7 +823,7 @@ elif pagina == "Configuracion":
         intervalo = c3.number_input("Intervalo entre horarios disponibles (min)", min_value=5, step=5,
                                      value=negocio["intervalo_min"])
         dias_actuales = negocio["dias_laborales"].split(",")
-        dias = st.multiselect("Dias laborales", options=db.DIAS_SEMANA, default=dias_actuales)
+        dias = st.multiselect("Días laborales", options=db.DIAS_SEMANA, default=dias_actuales)
 
         dc1, dc2 = st.columns(2)
         descanso_inicio = dc1.text_input(
@@ -817,7 +831,7 @@ elif pagina == "Configuracion":
         descanso_fin = dc2.text_input(
             "Descanso hasta (HH:MM)", value=negocio.get("descanso_fin") or "15:00", disabled=not tiene_descanso)
 
-        if st.form_submit_button("Guardar configuracion"):
+        if st.form_submit_button("Guardar configuración"):
             hora_apertura, hora_cierre = hora_apertura.strip(), hora_cierre.strip()
             descanso_inicio, descanso_fin = (descanso_inicio.strip(), descanso_fin.strip()) if tiene_descanso else ("", "")
 
@@ -830,31 +844,31 @@ elif pagina == "Configuracion":
             elif tiene_descanso and not (hora_apertura <= descanso_inicio < descanso_fin <= hora_cierre):
                 st.error("El descanso debe caer dentro del horario del negocio, con la hora 'desde' antes que 'hasta'.")
             elif not dias:
-                st.error("Elige al menos un dia laboral.")
+                st.error("Elige al menos un día laboral.")
             else:
                 db.set_negocio(nombre.strip(), tipo, hora_apertura, hora_cierre, dias, int(intervalo),
                                 descanso_inicio, descanso_fin)
-                st.success("Configuracion guardada.")
+                st.success("Configuración guardada.")
                 st.rerun()
 
 # ---------------------------------------------------------------- Estadisticas (solo dueno)
-elif pagina == "Estadisticas":
-    st.title("📊 Estadisticas del negocio")
-    st.caption("Solo visible para el dueno. Cuenta cada cita una vez que ya tuvo un resultado final.")
+elif pagina == "Estadísticas":
+    st.title("📊 Estadísticas del negocio")
+    st.caption("Solo visible para el dueño. Cuenta cada cita una vez que ya tuvo un resultado final.")
 
     hoy = hoy_negocio()
     preset = st.selectbox(
         "Rango de fechas",
-        ["Hoy", "Ultimos 7 dias", "Este mes", "Ultimos 30 dias", "Personalizado"],
+        ["Hoy", "Últimos 7 días", "Este mes", "Últimos 30 días", "Personalizado"],
         index=2,
     )
     if preset == "Hoy":
         fecha_inicio, fecha_fin = hoy, hoy
-    elif preset == "Ultimos 7 dias":
+    elif preset == "Últimos 7 días":
         fecha_inicio, fecha_fin = hoy - timedelta(days=6), hoy
     elif preset == "Este mes":
         fecha_inicio, fecha_fin = hoy.replace(day=1), hoy
-    elif preset == "Ultimos 30 dias":
+    elif preset == "Últimos 30 días":
         fecha_inicio, fecha_fin = hoy - timedelta(days=29), hoy
     else:
         c1, c2 = st.columns(2)
@@ -862,9 +876,9 @@ elif pagina == "Estadisticas":
         fecha_fin = c2.date_input("Hasta", value=hoy)
 
     if fecha_inicio > fecha_fin:
-        st.error("La fecha 'Desde' no puede ser despues de 'Hasta'.")
+        st.error("La fecha 'Desde' no puede ser después de 'Hasta'.")
     else:
-        agrupar_por = st.radio("Agrupar graficas por:", ["Dia", "Semana", "Quincena", "Mes"], horizontal=True)
+        agrupar_por = st.radio("Agrupar gráficas por:", ["Día", "Semana", "Quincena", "Mes"], horizontal=True)
 
         registros = db.citas_finalizadas(fecha_inicio.isoformat(), fecha_fin.isoformat())
 
@@ -875,7 +889,7 @@ elif pagina == "Estadisticas":
             df["fecha"] = pd.to_datetime(df["fecha"])
 
             def periodo_de(f):
-                if agrupar_por == "Dia":
+                if agrupar_por == "Día":
                     return f.strftime("%Y-%m-%d")
                 if agrupar_por == "Semana":
                     return (f - pd.Timedelta(days=f.weekday())).strftime("Semana del %Y-%m-%d")
@@ -907,9 +921,9 @@ elif pagina == "Estadisticas":
             if servicios_sin_precio:
                 nombres = ", ".join(servicios_sin_precio)
                 st.warning(
-                    f"'{nombres}' no tiene precio configurado (o esta en $0), por eso las citas "
+                    f"'{nombres}' no tiene precio configurado (o está en $0), por eso las citas "
                     f"completadas de ese servicio no suman a 'Ganado'. Ponle precio en la pagina 'Servicios' "
-                    f"si deberia contar."
+                    f"si debería contar."
                 )
 
             st.caption("Promedios de lo ganado sobre el rango de fechas seleccionado")
@@ -943,7 +957,7 @@ elif pagina == "Estadisticas":
             st.altair_chart(chart_estados, use_container_width=True)
 
             # ---- Grafica 2 (pastel): distribucion de resultados en todo el rango
-            st.subheader("Distribucion de citas por resultado (todo el rango)")
+            st.subheader("Distribución de citas por resultado (todo el rango)")
             conteo_total = df.groupby("estado").size().reset_index(name="cantidad")
             conteo_total["porcentaje"] = conteo_total["cantidad"] / conteo_total["cantidad"].sum()
             base_pie1 = alt.Chart(conteo_total).encode(

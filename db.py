@@ -210,6 +210,24 @@ def buscar_clientes(termino):
         return [dict(r) for r in rows]
 
 
+def buscar_cliente_exacto(termino):
+    """Para que un paciente/cliente que regresa se encuentre en la pagina
+    publica: solo coincidencia exacta de telefono o de correo (sin importar
+    mayusculas). A proposito NO busca por nombre ni por pedazos, para que
+    nadie pueda sacar la lista de clientes escribiendo una letra."""
+    termino = (termino or "").strip()
+    if not termino:
+        return []
+    with get_conn() as conn:
+        rows = conn.execute(
+            """SELECT * FROM clientes
+               WHERE telefono = ? OR (email != '' AND LOWER(email) = LOWER(?))
+               ORDER BY nombre""",
+            (termino, termino),
+        )
+        return [dict(r) for r in rows]
+
+
 def add_cliente(nombre, telefono, email, notas):
     with get_conn() as conn:
         cur = conn.execute("INSERT INTO clientes (nombre, telefono, email, notas) VALUES (?, ?, ?, ?)",
