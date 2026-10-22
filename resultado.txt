@@ -1,0 +1,6 @@
+Menu al entrar (aria-expanded): cerrado
+Botones del menu (testid, visible, dentro de stToolbar): [['stSidebar', True, False], ['stSidebarContent', True, False], ['stSidebarHeader', True, False], ['stSidebarUserContent', True, False], ['stExpander', True, False], ['stExpanderDetails', True, False], ['stSidebarResizeHandle', True, False], ['stExpandSidebarButton', True, True]]
+Fork visible: False
+Menu abierto (aria-expanded): ABIERTO
+Tras elegir 'Pacientes' (aria-expanded): cerrado
+Expediente abierto: True
