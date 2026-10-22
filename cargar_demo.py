@@ -83,16 +83,41 @@ DIAS_ATRAS = 60
 DIAS_ADELANTE = 14
 
 
+def _leer_toml_simple(texto):
+    """Lector minimo de TOML para Python < 3.11 (sin tomllib): entiende
+    secciones [a.b] y lineas clave = "valor", que es todo lo que usa
+    secrets.toml."""
+    datos, actual = {}, None
+    actual = datos
+    for linea in texto.splitlines():
+        linea = linea.strip()
+        if not linea or linea.startswith("#"):
+            continue
+        if linea.startswith("[") and linea.endswith("]"):
+            actual = datos
+            for parte in linea[1:-1].strip().split("."):
+                actual = actual.setdefault(parte.strip(), {})
+            continue
+        if "=" in linea:
+            clave, valor = linea.split("=", 1)
+            valor = valor.strip()
+            if len(valor) >= 2 and valor[0] == valor[-1] and valor[0] in "\"'":
+                valor = valor[1:-1]
+            actual[clave.strip()] = valor
+    return datos
+
+
 def _credenciales_de_secrets(slug):
-    try:
-        import tomllib
-    except ImportError:
-        sys.exit("Se necesita Python 3.11 o mas nuevo para leer .streamlit/secrets.toml.")
     ruta = os.path.join(".streamlit", "secrets.toml")
     if not os.path.exists(ruta):
         sys.exit(f"No encuentro {ruta} en esta carpeta.")
-    with open(ruta, "rb") as f:
-        secretos = tomllib.load(f)
+    try:
+        import tomllib
+        with open(ruta, "rb") as f:
+            secretos = tomllib.load(f)
+    except ImportError:
+        with open(ruta, encoding="utf-8") as f:
+            secretos = _leer_toml_simple(f.read())
     datos = secretos.get("negocios", {}).get(slug)
     if not datos:
         disponibles = ", ".join(secretos.get("negocios", {}).keys()) or "(ninguno)"
