@@ -121,6 +121,21 @@ def _init_db():
             )
         if "evento_calendar_id" not in columnas_citas:
             conn.execute("ALTER TABLE citas ADD COLUMN evento_calendar_id TEXT")
+        # Ficha medica basica del paciente (en la misma tabla clientes)
+        columnas_clientes = {row["name"] for row in conn.execute("PRAGMA table_info(clientes)")}
+        for columna in ["alergias", "padecimientos", "medicamentos", "contacto_emergencia",
+                        "fecha_nacimiento", "tipo_sangre"]:
+            if columna not in columnas_clientes:
+                conn.execute(f"ALTER TABLE clientes ADD COLUMN {columna} TEXT")
+        # Notas por consulta (lo que hizo el doctor en cada visita)
+        conn.execute("""CREATE TABLE IF NOT EXISTS notas_consulta (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cliente_id INTEGER NOT NULL REFERENCES clientes(id),
+                cita_id INTEGER REFERENCES citas(id),
+                fecha TEXT NOT NULL,
+                autor TEXT,
+                texto TEXT NOT NULL,
+                creada_el TEXT NOT NULL)""")
         columnas_negocio = {row["name"] for row in conn.execute("PRAGMA table_info(negocio)")}
         if "descanso_inicio" not in columnas_negocio:
             conn.execute("ALTER TABLE negocio ADD COLUMN descanso_inicio TEXT")
@@ -489,6 +504,7 @@ def editar_cita(cita_id, cliente_id, proveedor_id, servicio_id, fecha, hora_inic
 def list_citas(fecha=None, proveedor_id=None):
     with get_conn() as conn:
         q = """SELECT citas.*, clientes.nombre AS cliente_nombre, clientes.telefono AS cliente_telefono,
+                      clientes.alergias AS cliente_alergias,
                       proveedores.nombre AS proveedor_nombre, servicios.nombre AS servicio_nombre
                FROM citas
                JOIN clientes ON clientes.id = citas.cliente_id
@@ -509,3 +525,59 @@ def list_citas(fecha=None, proveedor_id=None):
 def cambiar_estado_cita(cita_id, estado):
     with get_conn() as conn:
         conn.execute("UPDATE citas SET estado=? WHERE id=?", (estado, cita_id))
+
+
+# ---------- Historial y expediente del paciente ----------
+
+def get_cliente(cliente_id):
+    with get_conn() as conn:
+        fila = conn.execute("SELECT * FROM clientes WHERE id = ?", (cliente_id,)).fetchone()
+        return dict(fila) if fila else None
+
+
+def historial_citas(cliente_id):
+    """Todas las citas del paciente (la mas reciente primero), con servicio,
+    doctor y precio."""
+    with get_conn() as conn:
+        q = """SELECT citas.*, servicios.nombre AS servicio_nombre, COALESCE(servicios.precio, 0) AS precio,
+                      proveedores.nombre AS proveedor_nombre
+               FROM citas
+               JOIN servicios ON servicios.id = citas.servicio_id
+               JOIN proveedores ON proveedores.id = citas.proveedor_id
+               WHERE citas.cliente_id = ?
+               ORDER BY citas.fecha DESC, citas.hora_inicio DESC"""
+        return [dict(r) for r in conn.execute(q, (cliente_id,))]
+
+
+def update_ficha_medica(cliente_id, alergias, padecimientos, medicamentos, contacto_emergencia,
+                        fecha_nacimiento, tipo_sangre):
+    with get_conn() as conn:
+        conn.execute(
+            """UPDATE clientes SET alergias=?, padecimientos=?, medicamentos=?, contacto_emergencia=?,
+               fecha_nacimiento=?, tipo_sangre=? WHERE id=?""",
+            (alergias, padecimientos, medicamentos, contacto_emergencia, fecha_nacimiento or None,
+             tipo_sangre, cliente_id))
+
+
+def list_notas(cliente_id):
+    with get_conn() as conn:
+        q = """SELECT notas_consulta.*, servicios.nombre AS servicio_nombre, citas.hora_inicio
+               FROM notas_consulta
+               LEFT JOIN citas ON citas.id = notas_consulta.cita_id
+               LEFT JOIN servicios ON servicios.id = citas.servicio_id
+               WHERE notas_consulta.cliente_id = ?
+               ORDER BY notas_consulta.fecha DESC, notas_consulta.id DESC"""
+        return [dict(r) for r in conn.execute(q, (cliente_id,))]
+
+
+def add_nota(cliente_id, texto, fecha, autor="", cita_id=None):
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT INTO notas_consulta (cliente_id, cita_id, fecha, autor, texto, creada_el)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (cliente_id, cita_id, fecha, autor, texto, datetime.now().isoformat(timespec="seconds")))
+
+
+def delete_nota(nota_id):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM notas_consulta WHERE id = ?", (nota_id,))

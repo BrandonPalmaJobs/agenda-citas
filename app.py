@@ -632,6 +632,144 @@ def pagina_reservar_publica():
     ui.pie()
 
 
+# ---------------------------------------------------------------- Expediente del paciente
+def _edad(fecha_txt):
+    try:
+        f = date.fromisoformat(fecha_txt)
+    except (TypeError, ValueError):
+        return None
+    h = hoy_negocio()
+    return h.year - f.year - ((h.month, h.day) < (f.month, f.day))
+
+
+def pagina_expediente(cliente_id):
+    cl = db.get_cliente(cliente_id)
+    if not cl:
+        st.session_state.paciente_abierto = None
+        st.rerun()
+    st.button(f"← Volver a {V['clientes']}", on_click=lambda: st.session_state.update(paciente_abierto=None))
+
+    citas = db.historial_citas(cliente_id)
+    hoy_iso = hoy_negocio().isoformat()
+    completadas = [c for c in citas if c["estado"] == "Completada"]
+    faltas = [c for c in citas if c["estado"] == "No asistio"]
+    proximas = sorted([c for c in citas if c["estado"] == "Agendada" and c["fecha"] >= hoy_iso],
+                      key=lambda c: (c["fecha"], c["hora_inicio"]))
+    ultima = completadas[0]["fecha"] if completadas else None
+
+    edad = _edad(cl.get("fecha_nacimiento"))
+    sub = " · ".join(x for x in [cl.get("telefono") or "", cl.get("email") or "",
+                                 f"{edad} años" if edad is not None else ""] if x)
+    st.markdown(f'<div class="ak-nombre" style="font-size:1.7rem">{ui.escapar(cl["nombre"])}</div>'
+                f'<div class="ak-sub">{ui.escapar(sub)}</div>', unsafe_allow_html=True)
+    if (cl.get("alergias") or "").strip():
+        st.error(f"⚠️ **Alergias:** {cl['alergias']}")
+
+    ui.kpis([
+        ("🗓️", "Citas", len([c for c in citas if c["estado"] != "Cancelada"]), ui.TEAL_CLARO, ui.TEAL),
+        ("✅", "Completadas", len(completadas), "#ECFDF5", "#047857"),
+        ("⚠️", "Faltas", len(faltas), "#FFFBEB", "#B45309"),
+        ("💵", "Total pagado", f"${sum(c['precio'] for c in completadas):,.0f}", "#EFF6FF", "#1D4ED8"),
+    ])
+    linea = []
+    if ultima:
+        linea.append(f"Última visita: **{fecha_legible(date.fromisoformat(ultima))}**")
+    if proximas:
+        p0 = proximas[0]
+        linea.append(f"Próxima cita: **{fecha_legible(date.fromisoformat(p0['fecha']))} a las {p0['hora_inicio']}** "
+                     f"({p0['servicio_nombre']})")
+    if linea:
+        st.markdown(" · ".join(linea))
+
+    t_hist, t_notas, t_ficha, t_datos = st.tabs(["🗓️ Historial", "📝 Notas de consulta", "🩺 Ficha médica", "✏️ Datos"])
+
+    with t_hist:
+        if not citas:
+            st.info("Todavía no tiene citas.")
+        for c in citas:
+            f = date.fromisoformat(c["fecha"])
+            precio = f" · ${c['precio']:,.0f}" if c["precio"] else ""
+            st.markdown(
+                f'<div class="ak-hist"><div><b>{ui.escapar(fecha_legible(f).capitalize())} {f.year}</b> · '
+                f'{ui.escapar(c["hora_inicio"])} &nbsp;{ui.chip_estado(c["estado"])}</div>'
+                f'<div class="ak-cita-linea">{ui.escapar(c["servicio_nombre"])} · con '
+                f'<b>{ui.escapar(c["proveedor_nombre"])}</b>{precio}</div>'
+                + (f'<div class="ak-cita-linea">Nota de la cita: {ui.escapar(c["notas"])}</div>' if c.get("notas") else "")
+                + '</div>', unsafe_allow_html=True)
+
+    with t_notas:
+        st.caption("Lo que se hizo en cada consulta, para tenerlo a la mano en la siguiente visita.")
+        with st.form(f"form_nota_{cliente_id}", clear_on_submit=True):
+            n1, n2 = st.columns([1, 2])
+            fecha_nota = n1.date_input("Fecha", value=hoy_negocio(), format="DD/MM/YYYY")
+            opciones_cita = {0: "(sin cita relacionada)"} | {
+                c["id"]: f"{c['fecha']} {c['hora_inicio']} · {c['servicio_nombre']}" for c in citas[:30]}
+            cita_rel = n2.selectbox("Cita relacionada", options=list(opciones_cita.keys()),
+                                    format_func=lambda k: opciones_cita[k])
+            texto = st.text_area("Nota", placeholder="Ej. Resina en pieza 36. Próxima limpieza en 6 meses.")
+            if st.form_submit_button("Guardar nota", type="primary", use_container_width=True):
+                if texto.strip():
+                    autor = "Dueño" if st.session_state.rol == "dueño" else "Personal"
+                    db.add_nota(cliente_id, texto.strip(), fecha_nota.isoformat(), autor, cita_rel or None)
+                    st.success("Nota guardada.")
+                    st.rerun()
+                else:
+                    st.error("Escribe la nota.")
+        notas = db.list_notas(cliente_id)
+        if not notas:
+            st.info("Todavía no hay notas de consulta.")
+        for n in notas:
+            f = date.fromisoformat(n["fecha"])
+            extra = f" · {n['servicio_nombre']}" if n.get("servicio_nombre") else ""
+            with st.container(border=True):
+                st.markdown(f"**{fecha_legible(f).capitalize()} {f.year}**{extra} · _{n.get('autor') or ''}_")
+                st.write(n["texto"])
+                if st.session_state.rol == "dueño" and st.button("Borrar", key=f"borrar_nota_{n['id']}"):
+                    db.delete_nota(n["id"])
+                    st.rerun()
+
+    with t_ficha:
+        st.caption("Datos de salud del paciente. Son datos sensibles: compártelos solo con quien lo atiende.")
+        with st.form(f"form_ficha_{cliente_id}"):
+            alergias = st.text_input("Alergias", value=cl.get("alergias") or "",
+                                     placeholder="Ej. Penicilina, látex. Déjalo vacío si no tiene.")
+            padecimientos = st.text_area("Enfermedades o padecimientos", value=cl.get("padecimientos") or "",
+                                         placeholder="Ej. Diabetes tipo 2, hipertensión")
+            medicamentos = st.text_area("Medicamentos que toma", value=cl.get("medicamentos") or "")
+            f1, f2, f3 = st.columns(3)
+            try:
+                fn_valor = date.fromisoformat(cl["fecha_nacimiento"]) if cl.get("fecha_nacimiento") else None
+            except ValueError:
+                fn_valor = None
+            fecha_nac = f1.date_input("Fecha de nacimiento", value=fn_valor, min_value=date(1900, 1, 1),
+                                      max_value=hoy_negocio(), format="DD/MM/YYYY")
+            tipos = ["", "O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"]
+            tipo_sangre = f2.selectbox("Tipo de sangre", tipos,
+                                       index=tipos.index(cl.get("tipo_sangre") or "") if (cl.get("tipo_sangre") or "") in tipos else 0)
+            contacto = f3.text_input("Contacto de emergencia", value=cl.get("contacto_emergencia") or "",
+                                     placeholder="Nombre y teléfono")
+            if st.form_submit_button("Guardar ficha médica", type="primary", use_container_width=True):
+                db.update_ficha_medica(cliente_id, alergias.strip(), padecimientos.strip(), medicamentos.strip(),
+                                       contacto.strip(), fecha_nac.isoformat() if fecha_nac else "", tipo_sangre)
+                st.success("Ficha médica guardada.")
+                st.rerun()
+
+    with t_datos:
+        with st.form(f"form_editar_cliente_{cliente_id}"):
+            c1, c2 = st.columns(2)
+            nombre_e = c1.text_input("Nombre", value=cl["nombre"])
+            telefono_e = c2.text_input("Teléfono", value=cl["telefono"] or "")
+            email_e = st.text_input("Email", value=cl["email"] or "")
+            notas_e = st.text_area("Notas generales", value=cl["notas"] or "")
+            if st.form_submit_button("Guardar cambios"):
+                if telefono_e.strip() and not telefono_valido(telefono_e):
+                    st.error("El teléfono debe tener 10 dígitos (solo números, sin espacios ni guiones).")
+                else:
+                    db.update_cliente(cliente_id, nombre_e.strip(), telefono_e.strip(), email_e.strip(), notas_e.strip())
+                    st.success("Actualizado.")
+                    st.rerun()
+
+
 # ---------------------------------------------------------------- Ruteo: publico vs panel del negocio
 if st.query_params.get("panel") != "staff":
     pagina_reservar_publica()
@@ -694,8 +832,12 @@ ICONOS_MENU = {"Agenda del día": "📅", "Nueva cita": "➕", V["Clientes"]: "�
 paginas = ["Agenda del día", "Nueva cita", V["Clientes"], "Servicios", "Personal", "Configuración"]
 if st.session_state.rol == "dueño":
     paginas.append("Estadísticas")
+if st.session_state.get("menu") not in paginas:
+    st.session_state.pop("menu", None)
 pagina = st.sidebar.radio("Menú", paginas, format_func=lambda p: f"{ICONOS_MENU.get(p, '')}  {p}",
-                          label_visibility="collapsed")
+                          label_visibility="collapsed", key="menu")
+if pagina != V["Clientes"]:
+    st.session_state.paciente_abierto = None
 # En celular/tableta el menu tapa la pantalla: al elegir una opcion se cierra solo
 # ...y tambien al entrar al panel: en celular se empieza viendo la agenda, no el menu
 if st.session_state.get("_pagina_anterior") != pagina:
@@ -780,6 +922,9 @@ if pagina == "Agenda del día":
         pasada = ya_paso(c)
         with st.container(border=True, key=f"{'cita_pasada' if pasada else 'cita'}_{c['id']}"):
             st.markdown(ui.tarjeta_cita_html(c, V["Cliente"], hora_pasada=pasada), unsafe_allow_html=True)
+            st.button("📋 Ver expediente", key=f"exp_{c['id']}",
+                      on_click=lambda cid=c["cliente_id"]: st.session_state.update(
+                          menu=V["Clientes"], paciente_abierto=cid))
             if c["estado"] == "Agendada":
                 b1, b2, b3, b4 = st.columns(4)
                 if b1.button("✓ Completar", key=f"comp_{c['id']}", type="primary", use_container_width=True):
@@ -919,43 +1064,36 @@ elif pagina == "Nueva cita":
 
 # ---------------------------------------------------------------- Clientes
 elif pagina == V["Clientes"]:
-    st.title(f"👥 {V['Clientes']}")
+    if st.session_state.get("paciente_abierto"):
+        pagina_expediente(st.session_state.paciente_abierto)
+    else:
+        st.title(f"👥 {V['Clientes']}")
 
-    with st.expander(f"Agregar {V['cliente']} nuevo"):
-        with st.form("form_nuevo_cliente"):
-            c1, c2 = st.columns(2)
-            nombre = c1.text_input("Nombre")
-            telefono = c2.text_input("Teléfono")
-            email = st.text_input("Correo (opcional - si lo pones, se le manda invitación de Calendar)")
-            notas = st.text_area("Notas (opcional)")
-            if st.form_submit_button("Guardar"):
-                if not nombre.strip():
-                    st.error(f"Ponle un nombre al {V['cliente']}.")
-                elif telefono.strip() and not telefono_valido(telefono):
-                    st.error("El teléfono debe tener 10 dígitos (solo números, sin espacios ni guiones).")
-                else:
-                    db.add_cliente(nombre.strip(), telefono.strip(), email.strip(), notas.strip())
-                    st.success(f"{V['Cliente']} agregado.")
-                    st.rerun()
-
-    busqueda = st.text_input("Buscar por nombre o teléfono")
-    clientes = db.list_clientes(busqueda or None)
-    st.caption(f"{len(clientes)} {V['cliente']}(s)")
-    for cl in clientes:
-        with st.expander(f"{cl['nombre']} - {cl['telefono'] or 'sin teléfono'}"):
-            with st.form(f"form_editar_cliente_{cl['id']}"):
+        with st.expander(f"Agregar {V['cliente']} nuevo"):
+            with st.form("form_nuevo_cliente"):
                 c1, c2 = st.columns(2)
-                nombre_e = c1.text_input("Nombre", value=cl["nombre"], key=f"nom_{cl['id']}")
-                telefono_e = c2.text_input("Teléfono", value=cl["telefono"] or "", key=f"tel_{cl['id']}")
-                email_e = st.text_input("Email", value=cl["email"] or "", key=f"mail_{cl['id']}")
-                notas_e = st.text_area("Notas", value=cl["notas"] or "", key=f"notas_{cl['id']}")
-                if st.form_submit_button("Guardar cambios"):
-                    if telefono_e.strip() and not telefono_valido(telefono_e):
+                nombre = c1.text_input("Nombre")
+                telefono = c2.text_input("Teléfono")
+                email = st.text_input("Correo (opcional - si lo pones, se le manda invitación de Calendar)")
+                notas = st.text_area("Notas (opcional)")
+                if st.form_submit_button("Guardar"):
+                    if not nombre.strip():
+                        st.error(f"Ponle un nombre al {V['cliente']}.")
+                    elif telefono.strip() and not telefono_valido(telefono):
                         st.error("El teléfono debe tener 10 dígitos (solo números, sin espacios ni guiones).")
                     else:
-                        db.update_cliente(cl["id"], nombre_e.strip(), telefono_e.strip(), email_e.strip(), notas_e.strip())
-                        st.success("Actualizado.")
+                        db.add_cliente(nombre.strip(), telefono.strip(), email.strip(), notas.strip())
+                        st.success(f"{V['Cliente']} agregado.")
                         st.rerun()
+
+        busqueda = st.text_input("Buscar por nombre o teléfono")
+        clientes = db.list_clientes(busqueda or None)
+        st.caption(f"{len(clientes)} {V['cliente']}(s) · toca uno para ver su expediente")
+        for cl in clientes:
+            alergia = " · ⚠️ alergias" if (cl.get("alergias") or "").strip() else ""
+            st.button(f"{cl['nombre']}  ·  {cl['telefono'] or 'sin teléfono'}{alergia}",
+                      key=f"abrir_{cl['id']}", use_container_width=True,
+                      on_click=lambda cid=cl["id"]: st.session_state.update(paciente_abierto=cid))
 
 # ---------------------------------------------------------------- Servicios
 elif pagina == "Servicios":

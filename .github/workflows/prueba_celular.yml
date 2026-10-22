@@ -86,6 +86,14 @@ jobs:
               pg.wait_for_timeout(5000)
               print("Tras elegir 'Pacientes' (aria-expanded):", estado())
               pg.screenshot(path="3_tras_elegir.png")
+              # Abrir el expediente del primer paciente
+              pg.get_by_role("button", name=re.compile("Ana Sof")).first.click()
+              pg.wait_for_timeout(5000)
+              pg.screenshot(path="4_expediente.png")
+              pg.get_by_role("tab", name=re.compile("Ficha")).click()
+              pg.wait_for_timeout(2000)
+              pg.screenshot(path="5_ficha.png")
+              print("Expediente abierto:", pg.get_by_text("Total pagado").count() > 0)
               b.close()
           PY
       - name: Log de la app
