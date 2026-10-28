@@ -1,0 +1,45 @@
+# Recarga los datos de la DEMO (Clinica Dental Aika Solutions) sin usar la PC:
+# borra lo que tenga la demo y carga dentistas, pacientes, citas alrededor de HOY,
+# fichas medicas y notas de consulta de ejemplo (antes guarda un respaldo como
+# archivo descargable de esta ejecucion).
+#
+# Necesita 2 secretos del repositorio (Settings > Secrets and variables > Actions):
+#   DEMO_TURSO_URL    -> el turso_database_url de [negocios.demo]
+#   DEMO_TURSO_TOKEN  -> el turso_auth_token de [negocios.demo]
+# Correr: pestana Actions > "Recargar la demo" > Run workflow (escribe SI).
+name: Recargar la demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmar:
+        description: "Esto BORRA y recarga los datos de la demo. Escribe SI para continuar"
+        required: true
+        default: "no"
+
+jobs:
+  recargar:
+    if: ${{ inputs.confirmar == 'SI' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q requests tzdata
+      - name: Recargar
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.DEMO_TURSO_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.DEMO_TURSO_TOKEN }}
+        run: |
+          if [ -z "$TURSO_DATABASE_URL" ] || [ -z "$TURSO_AUTH_TOKEN" ]; then
+            echo "Faltan los secretos DEMO_TURSO_URL / DEMO_TURSO_TOKEN"; exit 1
+          fi
+          echo SI | python cargar_demo.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: respaldo-demo
+          path: respaldos/
+          if-no-files-found: ignore
