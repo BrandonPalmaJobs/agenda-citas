@@ -1,78 +1,89 @@
 """
-Revisa agenda_citas.db por citas 'Agendada' que empiecen en las proximas
-2 horas y les manda un recordatorio de WhatsApp (solo si ya llenaste
-recordatorios_config.py con credenciales reales de Meta - si no, no hace
-nada y lo anota en el log).
+Manda los recordatorios de WhatsApp de TODAS las clinicas.
 
-Uso manual:
-    python enviar_recordatorios.py
+Recorre la lista central de clinicas (registro) y, en cada una, las citas
+'Agendada' que empiezan en las proximas HORAS_ANTES horas y aun no tienen
+recordatorio; les manda la plantilla con botones Confirmo / Necesito cancelar.
+Las clinicas bloqueadas (prueba vencida o suspendidas) se saltan.
 
-Pensado para correr solo cada 15-20 minutos via el Programador de tareas de
-Windows - ver instalar_recordatorios.bat.
+Corre solo en GitHub Actions cada 15 min (.github/workflows/recordatorios.yml).
+A mano:  python enviar_recordatorios.py            (todas)
+         python enviar_recordatorios.py --prueba   (no manda nada, solo muestra)
 """
 
 import os
+import sys
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 import db
+import registro
+import suscripcion
 import whatsapp
 
-LOG_PATH = "recordatorios.log"
-VENTANA_HORAS = 2
-
+HORAS_ANTES = int(os.environ.get("RECORDATORIO_HORAS_ANTES", "24"))
+ZONA = ZoneInfo("America/Mexico_City")
 MESES = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
          "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
-DIAS = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"]
+DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 
 
-def _fecha_legible(fecha_iso):
+def fecha_legible(fecha_iso, hoy):
     f = datetime.strptime(fecha_iso, "%Y-%m-%d").date()
-    return f"{DIAS[f.weekday()]} {f.day} de {MESES[f.month]}"
+    if f == hoy:
+        return "hoy"
+    if f == hoy + timedelta(days=1):
+        return f"mañana {DIAS[f.weekday()]} {f.day} de {MESES[f.month]}"
+    return f"el {DIAS[f.weekday()]} {f.day} de {MESES[f.month]}"
 
 
-def _log(mensaje):
-    linea = f"{datetime.now().isoformat(timespec='seconds')}  {mensaje}"
-    print(linea)
-    with open(LOG_PATH, "a", encoding="utf-8") as f:
-        f.write(linea + "\n")
+def procesar_clinica(slug, url, token, ahora, prueba):
+    db.usar_turso(url, token)
+    db.init_db()
+    negocio = db.get_negocio()
+    if suscripcion.estado(negocio, ahora.date())["bloqueado"]:
+        print(f"[{slug}] bloqueada, se salta")
+        return 0
+    limite = ahora + timedelta(hours=HORAS_ANTES)
+    citas = db.citas_para_recordar(ahora.strftime("%Y-%m-%dT%H:%M"), limite.strftime("%Y-%m-%dT%H:%M"))
+    enviados = 0
+    for c in citas:
+        if not c["cliente_telefono"]:
+            continue
+        cuando = fecha_legible(c["fecha"], ahora.date())
+        if prueba:
+            print(f"[{slug}] (prueba) {c['cliente_nombre']} {c['cliente_telefono']} {cuando} {c['hora_inicio']}")
+            continue
+        ok, error = whatsapp.enviar_recordatorio(
+            c["cliente_telefono"], c["cliente_nombre"].split()[0], negocio["nombre"], cuando,
+            c["hora_inicio"], c["proveedor_nombre"], ref=f"{slug}:{c['id']}")
+        if ok:
+            db.marcar_recordatorio_enviado(c["id"])
+            enviados += 1
+            print(f"[{slug}] cita {c['id']}: enviado a {c['cliente_nombre']}")
+        else:
+            print(f"[{slug}] cita {c['id']}: NO se pudo - {error}")
+    return enviados
 
 
 def main():
-    db.init_db()
-
-    if not whatsapp.credenciales_configuradas():
-        _log("Sin credenciales de WhatsApp configuradas todavia (recordatorios_config.py) - nada que hacer.")
+    prueba = "--prueba" in sys.argv
+    if not prueba and not whatsapp.credenciales_configuradas():
+        print("Sin credenciales de WhatsApp: nada que hacer.")
         return
-
-    ahora = datetime.now()
-    limite = ahora + timedelta(hours=VENTANA_HORAS)
-    citas = db.citas_para_recordar(
-        ahora.strftime("%Y-%m-%dT%H:%M"), limite.strftime("%Y-%m-%dT%H:%M")
-    )
-
-    if not citas:
-        _log("Sin citas por recordar en este momento.")
+    if not registro.configurado():
+        print("La lista central de clinicas no esta configurada.")
         return
-
-    negocio = db.get_negocio()
-    for c in citas:
-        if not c["cliente_telefono"]:
-            _log(f"Cita {c['id']}: el cliente no tiene telefono guardado, se omite.")
-            continue
-        ok, error = whatsapp.enviar_recordatorio(
-            telefono=c["cliente_telefono"],
-            cliente_nombre=c["cliente_nombre"],
-            negocio_nombre=negocio["nombre"],
-            fecha_legible=_fecha_legible(c["fecha"]),
-            hora=c["hora_inicio"],
-        )
-        if ok:
-            db.marcar_recordatorio_enviado(c["id"])
-            _log(f"Cita {c['id']} ({c['cliente_nombre']}, {c['fecha']} {c['hora_inicio']}): recordatorio enviado.")
-        else:
-            _log(f"Cita {c['id']} ({c['cliente_nombre']}): NO se pudo enviar - {error}")
+    ahora = datetime.now(ZONA).replace(tzinfo=None)
+    total = 0
+    for c in registro.listar():
+        try:
+            total += procesar_clinica(c["slug"], c["turso_database_url"], c["turso_auth_token"], ahora, prueba)
+        except Exception as e:
+            print(f"[{c['slug']}] error: {e}")
+    print(f"Recordatorios enviados: {total}")
 
 
 if __name__ == "__main__":

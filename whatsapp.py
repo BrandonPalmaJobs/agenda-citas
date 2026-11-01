@@ -1,66 +1,82 @@
 """
-Envio de recordatorios de citas por WhatsApp usando la Meta WhatsApp
-Business Cloud API. Las credenciales viven en recordatorios_config.py
-(no se sube a git - ver ese archivo para como llenarlo).
+WhatsApp (Meta WhatsApp Business Cloud API) para Aika Solutions.
 
-Este modulo no hace nada por si solo: enviar_recordatorios.py lo llama una
-vez por cada cita que necesita aviso.
+Credenciales (la primera que exista):
+  1. Variables de entorno: WHATSAPP_TOKEN y WHATSAPP_PHONE_NUMBER_ID
+     (asi corre en GitHub Actions, con secretos del repositorio)
+  2. recordatorios_config.py local (WHATSAPP_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID)
+
+Plantilla de recordatorio (se crea y aprueba en Meta, ver GUIA_WHATSAPP.md):
+  nombre: recordatorio_cita · idioma: es_MX · categoria: Utilidad
+  cuerpo: "Hola {{1}}, te recordamos tu cita en {{2}} el {{3}} a las {{4}} con {{5}}.
+           ¿Nos confirmas tu asistencia?"
+  botones de respuesta rapida: "Confirmo" y "Necesito cancelar"
 """
+
+import os
 
 import requests
 
-import recordatorios_config as config
+GRAPH = "https://graph.facebook.com/v21.0"
+PLANTILLA = os.environ.get("WHATSAPP_PLANTILLA", "recordatorio_cita")
+IDIOMA = os.environ.get("WHATSAPP_IDIOMA", "es_MX")
+CODIGO_PAIS = "52"
 
-GRAPH_API_URL = "https://graph.facebook.com/v20.0/{phone_number_id}/messages"
+
+def credenciales():
+    token = os.environ.get("WHATSAPP_TOKEN")
+    numero = os.environ.get("WHATSAPP_PHONE_NUMBER_ID")
+    if token and numero:
+        return token, numero
+    try:
+        import recordatorios_config as c
+        return (c.WHATSAPP_ACCESS_TOKEN or None), (c.WHATSAPP_PHONE_NUMBER_ID or None)
+    except ImportError:
+        return None, None
 
 
 def credenciales_configuradas():
-    return bool(config.WHATSAPP_PHONE_NUMBER_ID and config.WHATSAPP_ACCESS_TOKEN)
+    return all(credenciales())
 
 
 def normalizar_telefono(telefono):
-    """Deja el telefono en formato internacional (solo digitos, con codigo
-    de pais) que espera la API de WhatsApp. Asume numeros de Mexico si el
-    telefono no trae ya un codigo de pais."""
-    digitos = "".join(c for c in telefono if c.isdigit())
-    if digitos.startswith(config.CODIGO_PAIS):
-        return digitos
-    return config.CODIGO_PAIS + digitos
+    """Formato internacional sin '+': 52 + 10 digitos para Mexico."""
+    digitos = "".join(c for c in (telefono or "") if c.isdigit())
+    if len(digitos) == 10:
+        return CODIGO_PAIS + digitos
+    return digitos
 
 
-def enviar_recordatorio(telefono, cliente_nombre, negocio_nombre, fecha_legible, hora):
-    """Manda la plantilla de recordatorio a un telefono. Regresa (True, None)
-    si se mando, o (False, "razon") si no - nunca lanza una excepcion, para
-    que el script que llama a esto pueda seguir con la siguiente cita."""
-    if not credenciales_configuradas():
-        return False, "credenciales de WhatsApp no configuradas (recordatorios_config.py)"
-
-    url = GRAPH_API_URL.format(phone_number_id=config.WHATSAPP_PHONE_NUMBER_ID)
-    headers = {"Authorization": f"Bearer {config.WHATSAPP_ACCESS_TOKEN}"}
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": normalizar_telefono(telefono),
-        "type": "template",
-        "template": {
-            "name": config.WHATSAPP_TEMPLATE_NAME,
-            "language": {"code": config.WHATSAPP_TEMPLATE_IDIOMA},
-            "components": [{
-                "type": "body",
-                "parameters": [
-                    {"type": "text", "text": cliente_nombre},
-                    {"type": "text", "text": negocio_nombre},
-                    {"type": "text", "text": fecha_legible},
-                    {"type": "text", "text": hora},
-                ],
-            }],
-        },
-    }
-
+def _enviar(payload):
+    token, numero = credenciales()
+    if not (token and numero):
+        return False, "credenciales de WhatsApp no configuradas"
     try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=15)
+        r = requests.post(f"{GRAPH}/{numero}/messages", json={"messaging_product": "whatsapp", **payload},
+                          headers={"Authorization": f"Bearer {token}"}, timeout=20)
     except requests.RequestException as e:
         return False, f"error de conexion: {e}"
-
-    if resp.status_code == 200:
+    if r.status_code == 200:
         return True, None
-    return False, f"WhatsApp API respondio {resp.status_code}: {resp.text[:300]}"
+    return False, f"WhatsApp respondio {r.status_code}: {r.text[:300]}"
+
+
+def enviar_recordatorio(telefono, cliente_nombre, negocio_nombre, fecha_legible, hora,
+                        doctor="nuestro equipo", ref=""):
+    """Manda la plantilla con botones. `ref` (ej. 'demo:123') viaja escondido
+    en los botones para que el bot sepa que cita confirmar o cancelar."""
+    componentes = [{
+        "type": "body",
+        "parameters": [{"type": "text", "text": str(v)} for v in
+                       (cliente_nombre, negocio_nombre, fecha_legible, hora, doctor)],
+    }]
+    for i, accion in enumerate(("confirmar", "cancelar")):
+        componentes.append({"type": "button", "sub_type": "quick_reply", "index": str(i),
+                            "parameters": [{"type": "payload", "payload": f"{accion}:{ref}"}]})
+    return _enviar({"to": normalizar_telefono(telefono), "type": "template",
+                    "template": {"name": PLANTILLA, "language": {"code": IDIOMA}, "components": componentes}})
+
+
+def enviar_texto(telefono, texto):
+    """Texto libre: solo funciona si el paciente escribio en las ultimas 24 h."""
+    return _enviar({"to": normalizar_telefono(telefono), "type": "text", "text": {"body": texto}})
