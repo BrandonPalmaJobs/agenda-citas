@@ -7,7 +7,7 @@ import unicodedata
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from _datos import Base, registro
+from datos import Base, registro
 
 ZONA = ZoneInfo("America/Mexico_City")
 DIAS = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"]

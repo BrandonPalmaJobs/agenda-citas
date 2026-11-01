@@ -1,23 +1,22 @@
-"""Webhook de WhatsApp (Vercel): GET verifica con Meta, POST recibe mensajes."""
+"""Webhook de WhatsApp de Aika Citas (Vercel, WSGI).
+GET  /webhook  -> verificacion con Meta (hub.challenge)
+POST /webhook  -> mensajes entrantes
+GET  /         -> "funcionando" (para revisar que esta vivo)
+"""
 
 import json
 import os
-import sys
 import traceback
-from http.server import BaseHTTPRequestHandler
-from urllib.parse import parse_qs, urlparse
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from urllib.parse import parse_qs
 
 import requests
 
-import _logica as logica
+import logica
 
 GRAPH = "https://graph.facebook.com/v21.0"
 
 
 def mandar(tel, resp):
-    """Convierte una respuesta del bot en mensaje de WhatsApp y lo envia."""
     if "botones" in resp:
         cuerpo = {"type": "interactive", "interactive": {
             "type": "button", "body": {"text": resp["texto"]},
@@ -46,7 +45,7 @@ def procesar(evento):
                 tel, texto, boton = m.get("from"), "", None
                 if m["type"] == "text":
                     texto = m["text"]["body"]
-                elif m["type"] == "button":  # boton de plantilla (recordatorio)
+                elif m["type"] == "button":
                     boton = m["button"].get("payload")
                 elif m["type"] == "interactive":
                     it = m["interactive"]
@@ -58,24 +57,21 @@ def procesar(evento):
                     mandar(tel, resp)
 
 
-class handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        q = parse_qs(urlparse(self.path).query)
-        if q.get("hub.verify_token", [""])[0] == os.environ.get("WHATSAPP_VERIFY_TOKEN") and q.get("hub.challenge"):
-            self._responder(200, q["hub.challenge"][0])
+def app(environ, start_response):
+    metodo = environ.get("REQUEST_METHOD", "GET")
+    q = parse_qs(environ.get("QUERY_STRING", ""))
+    codigo, texto = "200 OK", "Bot de Aika Citas funcionando"
+    if metodo == "GET" and "hub.mode" in q:
+        if q.get("hub.verify_token", [""])[0] == os.environ.get("WHATSAPP_VERIFY_TOKEN"):
+            texto = q.get("hub.challenge", [""])[0]
         else:
-            self._responder(200 if not q else 403, "Bot de Aika Citas funcionando" if not q else "token incorrecto")
-
-    def do_POST(self):
-        largo = int(self.headers.get("Content-Length", 0))
+            codigo, texto = "403 Forbidden", "token incorrecto"
+    elif metodo == "POST":
         try:
-            procesar(json.loads(self.rfile.read(largo) or b"{}"))
+            largo = int(environ.get("CONTENT_LENGTH") or 0)
+            procesar(json.loads(environ["wsgi.input"].read(largo) or b"{}"))
         except Exception:
             traceback.print_exc()
-        self._responder(200, "ok")  # siempre 200 para que Meta no reintente sin fin
-
-    def _responder(self, codigo, texto):
-        self.send_response(codigo)
-        self.send_header("Content-Type", "text/plain; charset=utf-8")
-        self.end_headers()
-        self.wfile.write(texto.encode())
+        texto = "ok"  # siempre 200 para que Meta no reintente sin fin
+    start_response(codigo, [("Content-Type", "text/plain; charset=utf-8")])
+    return [texto.encode()]
