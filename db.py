@@ -119,6 +119,8 @@ def _init_db():
             conn.execute(
                 "ALTER TABLE citas ADD COLUMN recordatorio_enviado INTEGER NOT NULL DEFAULT 0"
             )
+        if "confirmada" not in columnas_citas:
+            conn.execute("ALTER TABLE citas ADD COLUMN confirmada INTEGER NOT NULL DEFAULT 0")
         if "evento_calendar_id" not in columnas_citas:
             conn.execute("ALTER TABLE citas ADD COLUMN evento_calendar_id TEXT")
         # Ficha medica basica del paciente (en la misma tabla clientes)

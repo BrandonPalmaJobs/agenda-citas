@@ -466,7 +466,10 @@ def tarjeta_cita_html(c, etiqueta_cliente, hora_pasada=False):
     alergia = (" " + chip_html(f"⚠️ Alergia: {c['cliente_alergias'][:40]}", "#FFF1F2", "#BE123C")
                if (c.get("cliente_alergias") or "").strip() else "")
     chip = (chip_html("Ya pasó · sin registrar", "#FEF3C7", "#92400E") if hora_pasada
-            else chip_estado(c["estado"]))
+            else chip_html("✅ Confirmada por el paciente", "#ECFDF5", "#047857")
+            if c["estado"] == "Agendada" and c.get("confirmada") else chip_estado(c["estado"]))
+    if "WhatsApp" in (c.get("notas") or ""):
+        chip += " " + chip_html("💬 WhatsApp", "#F0FDF4", "#15803D")
     aviso = ('<div class="ak-cita-aviso">⚠️ La hora de esta cita ya pasó. ¿Qué pasó con ella? '
              'Márcala abajo como Completada, No asistió o Cancelada.</div>' if hora_pasada else "")
     return (
