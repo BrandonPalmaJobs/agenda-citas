@@ -57,8 +57,29 @@ def procesar(evento):
                     mandar(tel, resp)
 
 
+PRIVACIDAD = """<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Aviso de privacidad - Aika Citas</title>
+<style>body{font-family:system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 16px;line-height:1.6;color:#0f172a}</style>
+</head><body>
+<h1>Aviso de privacidad de Aika Citas</h1>
+<p><b>Responsable:</b> Aika Data And Systems ("Aika Solutions"), contacto: aikadataandsystems@gmail.com.</p>
+<p><b>Qué datos usamos:</b> nombre, número de teléfono y los datos de tus citas (fecha, hora, servicio y
+especialista) que proporcionas al agendar con una clínica que usa Aika Citas.</p>
+<p><b>Para qué:</b> agendar, confirmar, recordar y cancelar tus citas por WhatsApp y en la agenda en línea de la clínica.
+No vendemos ni compartimos tus datos con terceros para publicidad.</p>
+<p><b>Quién los ve:</b> la clínica con la que agendas y Aika Solutions como proveedor del servicio. Los mensajes se envían
+mediante la plataforma de WhatsApp Business de Meta.</p>
+<p><b>Tus derechos:</b> puedes pedir acceso, corrección o eliminación de tus datos (derechos ARCO) escribiendo a
+aikadataandsystems@gmail.com o respondiendo BAJA por WhatsApp.</p>
+<p>Última actualización: noviembre de 2026.</p>
+</body></html>"""
+
+
 def app(environ, start_response):
     metodo = environ.get("REQUEST_METHOD", "GET")
+    if environ.get("PATH_INFO", "").rstrip("/") in ("/privacidad", "/terminos"):
+        start_response("200 OK", [("Content-Type", "text/html; charset=utf-8")])
+        return [PRIVACIDAD.encode()]
     q = parse_qs(environ.get("QUERY_STRING", ""))
     codigo, texto = "200 OK", "Bot de Aika Citas funcionando"
     if metodo == "GET" and "hub.mode" in q:
