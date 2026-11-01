@@ -1,0 +1,26 @@
+# Conecta la cuenta de WhatsApp Business con la app de Meta (subscribed_apps)
+# para que Meta mande los mensajes entrantes al webhook del bot.
+name: Suscribir WhatsApp a la app
+
+on:
+  workflow_dispatch:
+    inputs:
+      waba_id:
+        description: "Identificador de la cuenta de WhatsApp Business"
+        default: "1594899265191285"
+
+jobs:
+  suscribir:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Suscribir y revisar
+        env:
+          TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+          WABA: ${{ inputs.waba_id }}
+        run: |
+          echo "--- Antes:"
+          curl -sS "https://graph.facebook.com/v21.0/$WABA/subscribed_apps" -H "Authorization: Bearer $TOKEN"; echo
+          echo "--- Suscribiendo:"
+          curl -sS -X POST "https://graph.facebook.com/v21.0/$WABA/subscribed_apps" -H "Authorization: Bearer $TOKEN"; echo
+          echo "--- Despues:"
+          curl -sS "https://graph.facebook.com/v21.0/$WABA/subscribed_apps" -H "Authorization: Bearer $TOKEN"; echo
