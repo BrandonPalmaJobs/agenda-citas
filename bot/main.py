@@ -16,6 +16,15 @@ import logica
 GRAPH = "https://graph.facebook.com/v21.0"
 
 
+def numero_destino(tel):
+    """WhatsApp entrega los numeros de Mexico como 521 + 10 digitos, pero para
+    ENVIAR hay que usar 52 + 10 digitos (si no: 'not in allowed list')."""
+    d = "".join(c for c in tel if c.isdigit())
+    if d.startswith("521") and len(d) == 13:
+        return "52" + d[3:]
+    return d
+
+
 def mandar(tel, resp):
     if "botones" in resp:
         cuerpo = {"type": "interactive", "interactive": {
@@ -33,7 +42,7 @@ def mandar(tel, resp):
         cuerpo = {"type": "text", "text": {"body": resp["texto"]}}
     r = requests.post(f"{GRAPH}/{os.environ['WHATSAPP_PHONE_NUMBER_ID']}/messages",
                       headers={"Authorization": f"Bearer {os.environ['WHATSAPP_TOKEN']}"},
-                      json={"messaging_product": "whatsapp", "to": tel, **cuerpo}, timeout=20)
+                      json={"messaging_product": "whatsapp", "to": numero_destino(tel), **cuerpo}, timeout=20)
     if r.status_code != 200:
         print("WhatsApp error:", r.status_code, r.text[:300])
 
