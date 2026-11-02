@@ -75,6 +75,14 @@ footer {{ visibility: hidden; }}
 
 h1, h2, h3 {{ color: {TEXTO}; letter-spacing: -0.02em; }}
 h1 {{ font-weight: 800 !important; }}
+@media (max-width: 640px) {{
+  [data-testid="stMain"] h1 {{ font-size: 1.7rem !important; line-height: 1.15 !important; }}
+}}
+/* Subir archivo: textos en espanol */
+[data-testid="stFileUploaderDropzone"] button {{ font-size: 0 !important; }}
+[data-testid="stFileUploaderDropzone"] button::after {{ content: "Subir archivo"; font-size: .9rem; }}
+[data-testid="stFileUploaderDropzoneInstructions"] small, [data-testid="stFileUploaderDropzoneInstructions"] span {{ font-size: 0 !important; }}
+[data-testid="stFileUploaderDropzoneInstructions"] > div::after {{ content: "Imagen PNG o JPG"; font-size: .8rem; color: {TEXTO_SUAVE}; }}
 
 /* Botones */
 [data-testid="stBaseButton-primary"], [data-testid="stBaseButton-primaryFormSubmit"] {{
@@ -307,7 +315,7 @@ h1 {{ font-weight: 800 !important; }}
 
 
 def _h(texto):
-    return html.escape(str(texto or ""))
+    return html.escape("" if texto is None else str(texto))
 
 
 def _html(contenido):

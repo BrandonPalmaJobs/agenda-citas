@@ -743,14 +743,14 @@ def pagina_expediente(cliente_id):
                 fn_valor = None
             fecha_nac = f1.date_input("Fecha de nacimiento", value=fn_valor, min_value=date(1900, 1, 1),
                                       max_value=hoy_negocio(), format="DD/MM/YYYY")
-            tipos = ["", "O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"]
+            tipos = ["Sin dato", "O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"]
             tipo_sangre = f2.selectbox("Tipo de sangre", tipos,
-                                       index=tipos.index(cl.get("tipo_sangre") or "") if (cl.get("tipo_sangre") or "") in tipos else 0)
+                                       index=tipos.index(cl.get("tipo_sangre")) if cl.get("tipo_sangre") in tipos else 0)
             contacto = f3.text_input("Contacto de emergencia", value=cl.get("contacto_emergencia") or "",
                                      placeholder="Nombre y teléfono")
             if st.form_submit_button("Guardar ficha médica", type="primary", use_container_width=True):
                 db.update_ficha_medica(cliente_id, alergias.strip(), padecimientos.strip(), medicamentos.strip(),
-                                       contacto.strip(), fecha_nac.isoformat() if fecha_nac else "", tipo_sangre)
+                                       contacto.strip(), fecha_nac.isoformat() if fecha_nac else "", "" if tipo_sangre == "Sin dato" else tipo_sangre)
                 st.success("Ficha médica guardada.")
                 st.rerun()
 
@@ -942,7 +942,10 @@ if pagina == "Agenda del día":
         st.session_state.editando_cita = None
 
     if not citas:
-        st.info("No hay citas agendadas para este día (con este filtro).")
+        if db.DIAS_SEMANA[fecha_sel.weekday()] not in (negocio["dias_laborales"] or "").split(","):
+            st.info("La clínica no abre este día. Cambia la fecha arriba para ver otro día.")
+        else:
+            st.info("No hay citas agendadas para este día (con este filtro).")
     if sin_registrar:
         st.warning(
             f"⚠️ {len(sin_registrar)} cita(s) ya pasaron su hora y siguen como \"Agendada\". "
@@ -1056,14 +1059,24 @@ elif pagina == "Nueva cita":
                                          format_func=lambda pid: next(p["nombre"] for p in proveedores if p["id"] == pid))
             duracion = next(s["duracion_min"] for s in servicios if s["id"] == servicio_id)
 
-            fecha_cita = st.date_input("Fecha", value=hoy_negocio())
+            _abiertos = (negocio["dias_laborales"] or "").split(",")
+            _inicial = hoy_negocio()
+            for _ in range(7):
+                if db.DIAS_SEMANA[_inicial.weekday()] in _abiertos:
+                    break
+                _inicial += timedelta(days=1)
+            fecha_cita = st.date_input("Fecha", value=_inicial, min_value=hoy_negocio(), format="DD/MM/YYYY")
+            _cerrado = db.DIAS_SEMANA[fecha_cita.weekday()] not in _abiertos
             horarios_base = generar_horarios(negocio["hora_apertura"], negocio["hora_cierre"], negocio["intervalo_min"])
             horarios_base = quitar_horas_pasadas(horarios_base, fecha_cita)
             horarios_base = quitar_horas_descanso(
                 horarios_base, duracion, negocio.get("descanso_inicio"), negocio.get("descanso_fin"))
             horarios = db.horarios_disponibles(proveedor_id, fecha_cita.isoformat(), duracion, horarios_base)
 
-            if not horarios:
+            if _cerrado:
+                st.warning(f"La clínica no abre ese día ({DIAS_NOMBRE.get(db.DIAS_SEMANA[fecha_cita.weekday()], '')}). Elige otra fecha.")
+                horarios = []
+            elif not horarios:
                 st.warning("No hay horarios disponibles para ese proveedor en esa fecha.")
             else:
                 st.write("Hora disponible")
@@ -1300,7 +1313,7 @@ elif pagina == "Estadísticas":
     preset = st.selectbox(
         "Rango de fechas",
         ["Hoy", "Últimos 7 días", "Este mes", "Últimos 30 días", "Personalizado"],
-        index=2,
+        index=3,
     )
     if preset == "Hoy":
         fecha_inicio, fecha_fin = hoy, hoy
