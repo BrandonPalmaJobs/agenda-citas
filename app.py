@@ -1364,8 +1364,8 @@ elif pagina == "Estadísticas":
             n_meses = max(len(dias_rango.to_period("M").unique()), 1)
 
             k1, k2 = st.columns(2)
-            k1.metric("Ganado (citas completadas)", f"${ganado:,.2f}")
-            k2.metric("Valor no cobrado (canceladas + no asistio)", f"${no_cobrado:,.2f}")
+            k1.metric("Ganado (citas completadas)", f"${ganado:,.0f}")
+            k2.metric("Valor no cobrado (canceladas + no asistio)", f"${no_cobrado:,.0f}")
             st.caption("El valor no cobrado es solo informativo - no se resta de lo ganado.")
 
             servicios_sin_precio = sorted(
@@ -1381,10 +1381,10 @@ elif pagina == "Estadísticas":
 
             st.caption("Promedios de lo ganado sobre el rango de fechas seleccionado")
             p1, p2, p3, p4 = st.columns(4)
-            p1.metric("Promedio diario", f"${ganado / n_dias:,.2f}")
-            p2.metric("Promedio semanal", f"${ganado / n_semanas:,.2f}")
-            p3.metric("Promedio quincenal", f"${ganado / n_quincenas:,.2f}")
-            p4.metric("Promedio mensual", f"${ganado / n_meses:,.2f}")
+            p1.metric("Promedio diario", f"${ganado / n_dias:,.0f}")
+            p2.metric("Promedio semanal", f"${ganado / n_semanas:,.0f}")
+            p3.metric("Promedio quincenal", f"${ganado / n_quincenas:,.0f}")
+            p4.metric("Promedio mensual", f"${ganado / n_meses:,.0f}")
 
             st.divider()
 

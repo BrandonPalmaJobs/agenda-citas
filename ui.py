@@ -79,7 +79,7 @@ h1 {{ font-weight: 800 !important; }}
   [data-testid="stMain"] h1 {{ font-size: 1.7rem !important; line-height: 1.15 !important; }}
 }}
 /* Subir archivo: textos en espanol */
-[data-testid="stFileUploaderDropzone"] button {{ font-size: 0 !important; }}
+[data-testid="stFileUploaderDropzone"] button, [data-testid="stFileUploaderDropzone"] button * {{ font-size: 0 !important; }}
 [data-testid="stFileUploaderDropzone"] button::after {{ content: "Subir archivo"; font-size: .9rem; }}
 [data-testid="stFileUploaderDropzoneInstructions"] small, [data-testid="stFileUploaderDropzoneInstructions"] span {{ font-size: 0 !important; }}
 [data-testid="stFileUploaderDropzoneInstructions"] > div::after {{ content: "Imagen PNG o JPG"; font-size: .8rem; color: {TEXTO_SUAVE}; }}
