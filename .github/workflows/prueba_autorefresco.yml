@@ -1,0 +1,64 @@
+# Prueba: la Agenda del dia se actualiza sola cuando entra una cita nueva
+# (servidor temporal con datos y claves de PRUEBA).
+name: Prueba agenda que se actualiza sola
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: |
+          pip install -q -r requirements.txt playwright
+          python -m playwright install --with-deps chromium > /dev/null
+          python -c "import streamlit; print('streamlit', streamlit.__version__)"
+      - run: |
+          mkdir -p .streamlit
+          printf 'staff_password = "prueba-staff-ci"\ndueno_password = "prueba-dueno-ci"\n' > .streamlit/secrets.toml
+          echo SI | python cargar_demo.py > /dev/null
+          nohup streamlit run app.py --server.headless true --server.port 8501 > streamlit.log 2>&1 &
+          for i in $(seq 1 60); do curl -s localhost:8501/_stcore/health && break; sleep 1; done
+      - name: Probar
+        run: |
+          python - <<'PY' 2>&1 | tee resultado.txt
+          import sqlite3
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          from playwright.sync_api import sync_playwright
+          hoy = datetime.now(ZoneInfo("America/Mexico_City")).date().isoformat()
+          with sync_playwright() as p:
+              b = p.chromium.launch(); pg = b.new_page(viewport={"width": 1400, "height": 900})
+              pg.goto("http://localhost:8501/?panel=staff", wait_until="networkidle"); pg.wait_for_timeout(4000)
+              pg.get_by_label("Clave de acceso").fill("prueba-staff-ci")
+              pg.get_by_role("button", name="Entrar").click(); pg.wait_for_timeout(6000)
+              print("Antes, aparece 'Paciente Refresco':", "Paciente Refresco" in pg.inner_text("body"))
+              c = sqlite3.connect("agenda_citas.db")
+              cid = c.execute("INSERT INTO clientes (nombre, telefono) VALUES ('Paciente Refresco', '5511112222')").lastrowid
+              s = c.execute("SELECT id FROM servicios LIMIT 1").fetchone()[0]
+              pr = c.execute("SELECT id FROM proveedores LIMIT 1").fetchone()[0]
+              c.execute("""INSERT INTO citas (cliente_id, proveedor_id, servicio_id, fecha, hora_inicio, hora_fin, estado, notas)
+                           VALUES (?, ?, ?, ?, '23:00', '23:30', 'Agendada', 'Agendada por WhatsApp')""", (cid, pr, s, hoy))
+              c.commit()
+              print("Cita insertada directo en la base (como lo hace el bot). Esperando sin tocar nada...")
+              for seg in range(5, 50, 5):
+                  pg.wait_for_timeout(5000)
+                  if "Paciente Refresco" in pg.inner_text("body"):
+                      print(f"OK: aparecio sola a los ~{seg} s"); break
+              else:
+                  print("FALLO: no aparecio en 45 s")
+              print("Aviso de nueva cita visible:", "Nueva cita por WhatsApp" in pg.inner_text("body"))
+              pg.screenshot(path="refresco.png", full_page=True)
+          PY
+      - if: always()
+        run: grep -iE "error|exception|traceback" -A3 streamlit.log | head -30 || true
+      - if: always()
+        run: |
+          mkdir salida && mv *.png resultado.txt salida/ 2>/dev/null; cd salida
+          git init -q && git checkout -q -b capturas
+          git config user.name "capturas-bot" && git config user.email "capturas-bot@users.noreply.github.com"
+          git add . && git commit -q -m "Prueba refresco" && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" capturas
