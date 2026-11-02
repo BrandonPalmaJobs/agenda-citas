@@ -1,0 +1,78 @@
+# Capturas de TODAS las pantallas (computadora y celular) con datos de prueba.
+name: Revision visual completa
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  capturar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: |
+          pip install -q -r requirements.txt playwright
+          python -m playwright install --with-deps chromium > /dev/null
+          mkdir -p .streamlit
+          printf 'staff_password = "prueba-staff-ci"\ndueno_password = "prueba-dueno-ci"\n' > .streamlit/secrets.toml
+          echo SI | python cargar_demo.py > /dev/null
+          nohup streamlit run app.py --server.headless true --server.port 8501 > streamlit.log 2>&1 &
+          for i in $(seq 1 60); do curl -s localhost:8501/_stcore/health && break; sleep 1; done
+      - name: Capturar
+        run: |
+          python - <<'PY' 2>&1 | tee resultado.txt
+          import re
+          from playwright.sync_api import sync_playwright
+          PAG = ["Agenda del día", "Nueva cita", "Pacientes", "Servicios", "Personal", "Configuración", "Estadísticas"]
+          def esperar(pg, ms=4000):
+              pg.wait_for_timeout(ms)
+              for _ in range(20):
+                  if not pg.locator('[data-testid="stStatusWidget"]').count(): break
+                  pg.wait_for_timeout(500)
+          def errores(pg, donde):
+              n = pg.locator('[data-testid="stException"], [data-testid="stAlertContentError"]').count()
+              if n: print("ERROR VISIBLE en", donde, ":", pg.locator('[data-testid="stException"]').first.inner_text()[:300] if pg.locator('[data-testid="stException"]').count() else "alerta")
+          with sync_playwright() as p:
+              b = p.chromium.launch()
+              for nombre, vp, movil in [("pc", {"width": 1440, "height": 900}, False), ("cel", {"width": 390, "height": 844}, True)]:
+                  ctx = b.new_context(viewport=vp, is_mobile=movil, has_touch=movil)
+                  pg = ctx.new_page()
+                  pg.goto("http://localhost:8501/", wait_until="networkidle"); esperar(pg)
+                  pg.screenshot(path=f"{nombre}_00_inicio.png", full_page=True); errores(pg, "inicio")
+                  pg.goto("http://localhost:8501/?negocio=demo", wait_until="networkidle"); esperar(pg)
+                  pg.screenshot(path=f"{nombre}_01_pacientes_reservar.png", full_page=True); errores(pg, "reservar")
+                  pg.goto("http://localhost:8501/?panel=staff", wait_until="networkidle"); esperar(pg)
+                  pg.screenshot(path=f"{nombre}_02_login.png", full_page=True)
+                  pg.get_by_label("Clave de acceso").fill("prueba-dueno-ci")
+                  pg.get_by_role("button", name="Entrar").click(); esperar(pg, 6000)
+                  for i, nom in enumerate(PAG):
+                      if movil:
+                          for sel in ['[data-testid="stExpandSidebarButton"]', '[data-testid="stSidebarCollapsedControl"] button']:
+                              if pg.locator(sel).count() and pg.locator(sel).first.is_visible():
+                                  pg.locator(sel).first.click(); pg.wait_for_timeout(1200); break
+                      pg.locator('[data-testid="stSidebar"] [data-testid="stRadioOption"]', has_text=nom).first.click(force=True)
+                      esperar(pg, 5000)
+                      pg.screenshot(path=f"{nombre}_1{i}_{nom.split()[0]}.png", full_page=True); errores(pg, nom)
+                  # expediente
+                  if movil:
+                      for sel in ['[data-testid="stExpandSidebarButton"]']:
+                          if pg.locator(sel).count() and pg.locator(sel).first.is_visible():
+                              pg.locator(sel).first.click(); pg.wait_for_timeout(1200)
+                  pg.locator('[data-testid="stSidebar"] [data-testid="stRadioOption"]', has_text="Pacientes").first.click(force=True); esperar(pg, 4000)
+                  pg.get_by_role("button", name=re.compile("Ana Sof")).first.click(); esperar(pg, 4000)
+                  for t in ["Historial", "Notas", "Ficha", "Datos"]:
+                      pg.get_by_role("tab", name=re.compile(t)).click(); pg.wait_for_timeout(1500)
+                      pg.screenshot(path=f"{nombre}_2_exp_{t}.png", full_page=True)
+                  ctx.close()
+              b.close()
+          PY
+      - if: always()
+        run: grep -iE "error|exception|traceback|deprecat|warning" -A2 streamlit.log | head -40 || true
+      - if: always()
+        run: |
+          mkdir salida && mv *.png resultado.txt streamlit.log salida/ 2>/dev/null; cd salida
+          git init -q && git checkout -q -b revision
+          git config user.name "capturas-bot" && git config user.email "capturas-bot@users.noreply.github.com"
+          git add . && git commit -q -m "Revision visual" && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" revision
