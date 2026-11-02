@@ -1,0 +1,29 @@
+# Muestra las citas de un telefono (para revisar que hizo el bot).
+name: Diagnostico de citas
+on:
+  workflow_dispatch:
+    inputs:
+      telefono:
+        default: "6271739405"
+jobs:
+  ver:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -q requests tzdata
+      - env:
+          REGISTRO_TURSO_URL: ${{ secrets.REGISTRO_TURSO_URL }}
+          REGISTRO_TURSO_TOKEN: ${{ secrets.REGISTRO_TURSO_TOKEN }}
+          TEL: ${{ inputs.telefono }}
+        run: |
+          python - <<'PY'
+          import os, db, registro
+          for c in registro.listar():
+              db.usar_turso(c["turso_database_url"], c["turso_auth_token"])
+              with db.get_conn() as conn:
+                  for r in conn.execute("""SELECT citas.id, fecha, hora_inicio, estado, confirmada, recordatorio_enviado, citas.notas
+                      FROM citas JOIN clientes ON clientes.id=citas.cliente_id WHERE clientes.telefono=? ORDER BY citas.id""", (os.environ["TEL"],)):
+                      print(c["slug"], dict(r))
+          PY
