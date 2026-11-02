@@ -77,6 +77,18 @@ def enviar_recordatorio(telefono, cliente_nombre, negocio_nombre, fecha_legible,
                     "template": {"name": PLANTILLA, "language": {"code": IDIOMA}, "components": componentes}})
 
 
+def enviar_recordatorio_simulado(telefono, cliente_nombre, negocio_nombre, fecha_legible, hora,
+                                 doctor="nuestro equipo", ref=""):
+    """Igual que el recordatorio pero sin plantilla (mensaje con botones).
+    Solo para pruebas: funciona si el paciente escribio en las ultimas 24 h."""
+    texto = (f"Hola {cliente_nombre}, te recordamos tu cita en {negocio_nombre} el {fecha_legible} "
+             f"a las {hora} con {doctor}. ¿Nos confirmas tu asistencia?")
+    botones = [{"type": "reply", "reply": {"id": f"{a}:{ref}", "title": t}}
+               for a, t in (("confirmar", "Confirmo"), ("cancelar", "Necesito cancelar"))]
+    return _enviar({"to": normalizar_telefono(telefono), "type": "interactive",
+                    "interactive": {"type": "button", "body": {"text": texto}, "action": {"buttons": botones}}})
+
+
 def enviar_texto(telefono, texto):
     """Texto libre: solo funciona si el paciente escribio en las ultimas 24 h."""
     return _enviar({"to": normalizar_telefono(telefono), "type": "text", "text": {"body": texto}})

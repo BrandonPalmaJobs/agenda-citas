@@ -24,6 +24,7 @@ import suscripcion
 import whatsapp
 
 HORAS_ANTES = int(os.environ.get("RECORDATORIO_HORAS_ANTES", "4"))
+SIMULADO = os.environ.get("RECORDATORIO_SIMULADO") == "1"  # prueba sin plantilla, no marca como enviado
 ZONA = ZoneInfo("America/Mexico_City")
 MESES = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
          "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
@@ -56,10 +57,13 @@ def procesar_clinica(slug, url, token, ahora, prueba):
         if prueba:
             print(f"[{slug}] (prueba) {c['cliente_nombre']} {c['cliente_telefono']} {cuando} {c['hora_inicio']}")
             continue
-        ok, error = whatsapp.enviar_recordatorio(
+        enviar = whatsapp.enviar_recordatorio_simulado if SIMULADO else whatsapp.enviar_recordatorio
+        ok, error = enviar(
             c["cliente_telefono"], c["cliente_nombre"].split()[0], negocio["nombre"], cuando,
             c["hora_inicio"], c["proveedor_nombre"], ref=f"{slug}:{c['id']}")
-        if ok:
+        if ok and SIMULADO:
+            print(f"[{slug}] cita {c['id']}: SIMULACION enviada a {c['cliente_nombre']}")
+        elif ok:
             db.marcar_recordatorio_enviado(c["id"])
             enviados += 1
             print(f"[{slug}] cita {c['id']}: enviado a {c['cliente_nombre']}")
