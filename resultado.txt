@@ -1,0 +1,4 @@
+Antes, aparece 'Paciente Refresco': False
+Cita insertada directo en la base (como lo hace el bot). Esperando sin tocar nada...
+OK: aparecio sola a los ~15 s
+Aviso de nueva cita visible: True
