@@ -7,6 +7,10 @@ on:
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch:
+    inputs:
+      horas_antes:
+        description: "Para pruebas: mandar a citas dentro de estas horas (normal: 4)"
+        default: "4"
 
 jobs:
   enviar:
@@ -24,4 +28,5 @@ jobs:
           WHATSAPP_PHONE_NUMBER_ID: ${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
           REGISTRO_TURSO_URL: ${{ secrets.REGISTRO_TURSO_URL }}
           REGISTRO_TURSO_TOKEN: ${{ secrets.REGISTRO_TURSO_TOKEN }}
+          RECORDATORIO_HORAS_ANTES: ${{ inputs.horas_antes || '4' }}
         run: python enviar_recordatorios.py

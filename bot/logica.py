@@ -364,7 +364,7 @@ def _agendar(b, negocio, servicios, proveedores, tel10, datos):
     fin = _hhmm(_min(datos["hora"]) + int(s["duracion_min"]))
     b.q("""INSERT INTO citas (cliente_id, proveedor_id, servicio_id, fecha, hora_inicio, hora_fin, estado, notas,
                               creada_el, recordatorio_enviado, confirmada)
-           VALUES (?, ?, ?, ?, ?, ?, 'Agendada', 'Agendada por WhatsApp', ?, 0, 1)""",
+           VALUES (?, ?, ?, ?, ?, ?, 'Agendada', 'Agendada por WhatsApp', ?, 0, 0)""",
         (cid, datos["proveedor"], s["id"], datos["fecha"], datos["hora"], fin, ahora().isoformat(timespec="seconds")))
     return [{"texto": f"🎉 ¡Listo! Tu cita quedó agendada {fecha_txt(datos['fecha'])} a las {datos['hora']}.\n"
                       "Te mandaremos un recordatorio antes. Si necesitas algo, escribe *hola*."}], "inicio", {}

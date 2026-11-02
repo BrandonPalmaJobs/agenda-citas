@@ -23,7 +23,7 @@ import registro
 import suscripcion
 import whatsapp
 
-HORAS_ANTES = int(os.environ.get("RECORDATORIO_HORAS_ANTES", "24"))
+HORAS_ANTES = int(os.environ.get("RECORDATORIO_HORAS_ANTES", "4"))
 ZONA = ZoneInfo("America/Mexico_City")
 MESES = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
          "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
