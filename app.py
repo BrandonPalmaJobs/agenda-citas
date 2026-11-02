@@ -874,6 +874,35 @@ if pagina == "Agenda del día":
 
     citas = db.list_citas(fecha=fecha_sel.isoformat(), proveedor_id=prov_sel or None)
 
+    # ---- Se actualiza sola: cada 20 s revisa si hay citas nuevas o cambios
+    # (por WhatsApp, la pagina de pacientes u otra computadora) y avisa.
+    _firma_actual = db.firma_citas(fecha_sel.isoformat())
+    st.session_state.firma_agenda = _firma_actual
+    st.session_state.setdefault("ultimo_id_visto", _firma_actual[0])
+
+    @st.fragment(run_every=20)
+    def _vigilar_agenda(fecha_iso):
+        if st.session_state.get("editando_cita"):
+            return  # no interrumpir mientras editan una cita
+        try:
+            firma = db.firma_citas(fecha_iso)
+        except Exception:
+            return
+        if firma == st.session_state.get("firma_agenda"):
+            return
+        for n in db.citas_nuevas_desde(st.session_state.get("ultimo_id_visto", firma[0])):
+            origen = " por WhatsApp" if "WhatsApp" in (n.get("notas") or "") else ""
+            st.session_state.setdefault("avisos_nuevas", []).append(
+                f"🔔 Nueva cita{origen}: {n['cliente_nombre']} · "
+                f"{n['fecha'][8:]}/{n['fecha'][5:7]} {n['hora_inicio']} con {n['proveedor_nombre']}")
+        st.session_state.ultimo_id_visto = firma[0]
+        st.rerun(scope="app")
+
+    _vigilar_agenda(fecha_sel.isoformat())
+    for _aviso in st.session_state.pop("avisos_nuevas", []):
+        st.toast(_aviso, icon="🔔")
+        st.success(_aviso)
+
     # Citas que siguen "Agendada" aunque su hora de fin ya paso: hay que
     # registrarlas (completada / no asistio / cancelada)
     _ahora = ahora_negocio()

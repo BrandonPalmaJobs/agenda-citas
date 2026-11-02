@@ -528,6 +528,29 @@ def list_citas(fecha=None, proveedor_id=None):
         return [dict(r) for r in conn.execute(q, params)]
 
 
+def firma_citas(fecha):
+    """Huella barata de las citas (para saber si algo cambio sin recargar todo):
+    (id mas alto de todas las citas, cuantas hay ese dia y como estan)."""
+    with get_conn() as conn:
+        maximo = conn.execute("SELECT COALESCE(MAX(id), 0) FROM citas").fetchone()[0]
+        dia = conn.execute("""SELECT COUNT(*), COALESCE(SUM(id * (CASE estado WHEN 'Agendada' THEN 1
+                              WHEN 'Completada' THEN 2 WHEN 'Cancelada' THEN 3 ELSE 4 END)), 0),
+                              COALESCE(SUM(COALESCE(confirmada, 0)), 0)
+                              FROM citas WHERE fecha = ?""", (fecha,)).fetchone()
+        return (maximo, tuple(dia))
+
+
+def citas_nuevas_desde(id_minimo):
+    """Citas creadas despues de id_minimo (para avisar al consultorio)."""
+    with get_conn() as conn:
+        filas = conn.execute("""SELECT citas.id, citas.fecha, citas.hora_inicio, citas.notas,
+                                       clientes.nombre AS cliente_nombre, proveedores.nombre AS proveedor_nombre
+                                FROM citas JOIN clientes ON clientes.id = citas.cliente_id
+                                JOIN proveedores ON proveedores.id = citas.proveedor_id
+                                WHERE citas.id > ? ORDER BY citas.id""", (id_minimo,))
+        return [dict(r) for r in filas]
+
+
 def cambiar_estado_cita(cita_id, estado):
     with get_conn() as conn:
         conn.execute("UPDATE citas SET estado=? WHERE id=?", (estado, cita_id))
