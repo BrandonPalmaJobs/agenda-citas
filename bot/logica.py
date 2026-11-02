@@ -230,6 +230,22 @@ def _elegido(entrada, prefijo, opciones):
     return None
 
 
+def _filtrar(proveedores, pid):
+    return [p for p in proveedores if p["id"] == pid] or proveedores if pid else proveedores
+
+
+def _dias(b, negocio, s, provs, datos):
+    dias = proximos_dias(b, negocio, s, provs)
+    if not dias:
+        return [{"texto": "No encontramos horarios libres pronto. Escribe *menu* para elegir otra opción."}], "menu", {}
+    filas = []
+    for iso in dias:
+        f = datetime.strptime(iso, "%Y-%m-%d").date()
+        filas.append((f"d_{iso}", f"{DIAS_TXT[f.weekday()].capitalize()} {f.day} {MESES[f.month]}", ""))
+    return [{"texto": f"*{s['nombre']}* ({s['duracion_min']} min). ¿Qué día te acomoda?", "lista": filas,
+             "boton_lista": "Ver días"}], "dia", {**datos, "dias": dias}
+
+
 def _flujo(b, negocio, tel10, estado, datos, entrada, norm):
     servicios, _ = b.q("SELECT * FROM servicios WHERE activo = 1 ORDER BY nombre")
     proveedores, _ = b.q("SELECT * FROM proveedores WHERE activo = 1 ORDER BY nombre")
@@ -276,21 +292,25 @@ def _flujo(b, negocio, tel10, estado, datos, entrada, norm):
         sid = _elegido(entrada, "s_", datos.get("servicios", []))
         if sid:
             s = next(x for x in servicios if x["id"] == int(sid))
-            dias = proximos_dias(b, negocio, s, proveedores)
-            if not dias:
-                return [{"texto": "No encontramos horarios libres pronto. Llámanos para ayudarte."}], "menu", {}
-            filas = []
-            for iso in dias:
-                f = datetime.strptime(iso, "%Y-%m-%d").date()
-                filas.append((f"d_{iso}", f"{DIAS_TXT[f.weekday()].capitalize()} {f.day} {MESES[f.month]}", ""))
-            return [{"texto": f"*{s['nombre']}* ({s['duracion_min']} min). ¿Qué día te acomoda?", "lista": filas,
-                     "boton_lista": "Ver días"}], "dia", {"servicio": s["id"], "dias": dias}
+            if len(proveedores) > 1:
+                filas = [("p_0", "Cualquiera", "El primero con horario libre")] + \
+                        [(f"p_{p['id']}", p["nombre"][:24], "") for p in proveedores[:9]]
+                return [{"texto": f"*{s['nombre']}*. ¿Con quién te gustaría tu cita?", "lista": filas,
+                         "boton_lista": "Ver especialistas"}], "doctor", \
+                    {"servicio": s["id"], "docs": [0] + [p["id"] for p in proveedores[:9]]}
+            return _dias(b, negocio, s, proveedores, {"servicio": s["id"], "doc": 0})
+
+    if estado == "doctor":
+        pid = _elegido(entrada, "p_", datos.get("docs", []))
+        if pid is not None:
+            s = next(x for x in servicios if x["id"] == datos["servicio"])
+            return _dias(b, negocio, s, _filtrar(proveedores, int(pid)), {**datos, "doc": int(pid)})
 
     if estado == "dia":
         iso = _elegido(entrada, "d_", datos.get("dias", []))
         if iso:
             s = next(x for x in servicios if x["id"] == datos["servicio"])
-            libres = horarios_libres(b, negocio, s, iso, proveedores)
+            libres = horarios_libres(b, negocio, s, iso, _filtrar(proveedores, datos.get("doc", 0)))
             # repartir los 10 horarios a lo largo del dia
             paso = max(1, len(libres) // 10 + (1 if len(libres) % 10 else 0))
             mostrar = libres[::paso][:10]
@@ -307,7 +327,7 @@ def _flujo(b, negocio, tel10, estado, datos, entrada, norm):
                 return _confirmar(b, negocio, servicios, proveedores, datos)
             return [{"texto": "Para terminar, ¿a nombre de quién agendo la cita? (nombre y apellido)"}], "nombre", datos
 
-    if estado == "nombre" and len(entrada) >= 3 and not entrada.startswith(("m_", "s_", "d_", "h_")):
+    if estado == "nombre" and len(entrada) >= 3 and not entrada.startswith(("m_", "s_", "p_", "d_", "h_")):
         return _confirmar(b, negocio, servicios, proveedores, {**datos, "nombre": entrada.title()[:60]})
 
     if estado == "confirmar":
