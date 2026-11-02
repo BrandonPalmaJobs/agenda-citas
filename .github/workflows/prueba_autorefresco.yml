@@ -41,8 +41,8 @@ jobs:
               cid = c.execute("INSERT INTO clientes (nombre, telefono) VALUES ('Paciente Refresco', '5511112222')").lastrowid
               s = c.execute("SELECT id FROM servicios LIMIT 1").fetchone()[0]
               pr = c.execute("SELECT id FROM proveedores LIMIT 1").fetchone()[0]
-              c.execute("""INSERT INTO citas (cliente_id, proveedor_id, servicio_id, fecha, hora_inicio, hora_fin, estado, notas)
-                           VALUES (?, ?, ?, ?, '23:00', '23:30', 'Agendada', 'Agendada por WhatsApp')""", (cid, pr, s, hoy))
+              c.execute("""INSERT INTO citas (cliente_id, proveedor_id, servicio_id, fecha, hora_inicio, hora_fin, estado, notas, creada_el)
+                           VALUES (?, ?, ?, ?, '23:00', '23:30', 'Agendada', 'Agendada por WhatsApp', ?)""", (cid, pr, s, hoy, hoy + 'T12:00:00'))
               c.commit()
               print("Cita insertada directo en la base (como lo hace el bot). Esperando sin tocar nada...")
               for seg in range(5, 50, 5):
