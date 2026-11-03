@@ -1,11 +1,10 @@
-# Manda los recordatorios de WhatsApp de todas las clinicas cada 15 minutos.
+# Recordatorios de WhatsApp A MANO / para pruebas. Los automaticos los manda el bot
+# en Vercel (/recordatorios), llamado por cron-job.org cada 15 minutos.
 # Secretos necesarios: WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID,
 # REGISTRO_TURSO_URL, REGISTRO_TURSO_TOKEN.
 name: Recordatorios de WhatsApp
 
 on:
-  schedule:
-    - cron: "*/15 * * * *"
   workflow_dispatch:
     inputs:
       horas_antes:

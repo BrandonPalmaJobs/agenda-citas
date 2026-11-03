@@ -2,6 +2,7 @@
 GET  /webhook  -> verificacion con Meta (hub.challenge)
 POST /webhook  -> mensajes entrantes
 GET  /         -> "funcionando" (para revisar que esta vivo)
+GET  /recordatorios?clave=...  -> manda recordatorios (lo llama cron-job.org)
 """
 
 import json
@@ -91,6 +92,18 @@ def app(environ, start_response):
         return [PRIVACIDAD.encode()]
     q = parse_qs(environ.get("QUERY_STRING", ""))
     codigo, texto = "200 OK", "Bot de Aika Citas funcionando"
+    if environ.get("PATH_INFO", "").rstrip("/") == "/recordatorios":
+        if q.get("clave", [""])[0] and q.get("clave", [""])[0] == os.environ.get("WHATSAPP_VERIFY_TOKEN"):
+            import recordatorios
+            try:
+                texto = recordatorios.correr(int(q.get("horas", [recordatorios.HORAS])[0]))
+            except Exception:
+                traceback.print_exc()
+                codigo, texto = "500 Internal Server Error", "error"
+        else:
+            codigo, texto = "403 Forbidden", "clave incorrecta"
+        start_response(codigo, [("Content-Type", "text/plain; charset=utf-8")])
+        return [texto.encode()]
     if metodo == "GET" and "hub.mode" in q:
         if q.get("hub.verify_token", [""])[0] == os.environ.get("WHATSAPP_VERIFY_TOKEN"):
             texto = q.get("hub.challenge", [""])[0]

@@ -33,11 +33,7 @@ DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "doming
 
 def fecha_legible(fecha_iso, hoy):
     f = datetime.strptime(fecha_iso, "%Y-%m-%d").date()
-    if f == hoy:
-        return "hoy"
-    if f == hoy + timedelta(days=1):
-        return f"mañana {DIAS[f.weekday()]} {f.day} de {MESES[f.month]}"
-    return f"el {DIAS[f.weekday()]} {f.day} de {MESES[f.month]}"
+    return f"{DIAS[f.weekday()]} {f.day} de {MESES[f.month]}"  # la plantilla ya dice "el {{3}}"
 
 
 def procesar_clinica(slug, url, token, ahora, prueba):
