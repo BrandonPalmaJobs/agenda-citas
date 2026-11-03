@@ -1,0 +1,29 @@
+# Crea en Meta las plantillas de aviso al paciente (quedan "En revision").
+name: Crear plantillas de WhatsApp
+on:
+  workflow_dispatch:
+    inputs:
+      waba_id:
+        default: "1594899265191285"
+jobs:
+  crear:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+          WABA: ${{ inputs.waba_id }}
+        run: |
+          crear() {
+            curl -sS -X POST "https://graph.facebook.com/v21.0/$WABA/message_templates" \
+              -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d "$1"; echo
+          }
+          crear '{"name":"cita_cancelada","language":"es_MX","category":"UTILITY","components":[
+            {"type":"BODY","text":"Hola {{1}}, te avisamos que tu cita en {{2}} del {{3}} a las {{4}} fue cancelada. Si quieres agendar otra fecha, responde a este mensaje o escribe hola.",
+             "example":{"body_text":[["Ana","Clínica Dental Aika Solutions","martes 3 de noviembre","10:00"]]}},
+            {"type":"FOOTER","text":"Aviso de tu consultorio dental"}]}'
+          crear '{"name":"cita_reprogramada","language":"es_MX","category":"UTILITY","components":[
+            {"type":"BODY","text":"Hola {{1}}, tu cita en {{2}} cambió de fecha. Nueva cita: {{3}} a las {{4}} con {{5}}. Si no te acomoda, responde a este mensaje o escribe hola.",
+             "example":{"body_text":[["Ana","Clínica Dental Aika Solutions","jueves 5 de noviembre","11:30","Dra. Mariana López"]]}},
+            {"type":"FOOTER","text":"Aviso de tu consultorio dental"}]}'
+          echo "--- Estado:"
+          curl -sS "https://graph.facebook.com/v21.0/$WABA/message_templates?fields=name,status&limit=20" -H "Authorization: Bearer $TOKEN"; echo

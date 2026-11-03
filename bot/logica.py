@@ -327,8 +327,26 @@ def _flujo(b, negocio, tel10, estado, datos, entrada, norm):
                 return _confirmar(b, negocio, servicios, proveedores, datos)
             return [{"texto": "Para terminar, ¿a nombre de quién agendo la cita? (nombre y apellido)"}], "nombre", datos
 
-    if estado == "nombre" and len(entrada) >= 3 and not entrada.startswith(("m_", "s_", "p_", "d_", "h_")):
-        return _confirmar(b, negocio, servicios, proveedores, {**datos, "nombre": entrada.title()[:60]})
+    if estado == "nombre" and len(entrada) >= 3 and not entrada.startswith(("m_", "s_", "p_", "d_", "h_", "yo_")):
+        nombre = " ".join(entrada.split()).title()[:60]
+        datos = {**datos, "nombre": nombre}
+        # Puede que ya sea paciente registrado con otro telefono: preguntar antes de duplicarlo
+        clave = _sin_acentos(nombre)
+        filas, _ = b.q("SELECT id, nombre, telefono FROM clientes")
+        iguales = [f for f in filas if _sin_acentos(" ".join((f["nombre"] or "").split())) == clave]
+        if len(iguales) == 1:
+            t = iguales[0]["telefono"] or ""
+            fin = f" con teléfono terminado en *{t[-4:]}*" if len(t) >= 4 else ""
+            return [{"texto": f"Ya tenemos registrado a *{iguales[0]['nombre']}*{fin}. ¿Eres tú?",
+                     "botones": [("yo_si", "Sí, soy yo"), ("yo_no", "No, soy otra persona")]}], \
+                "es_tu", {**datos, "posible": iguales[0]["id"]}
+        return _confirmar(b, negocio, servicios, proveedores, datos)
+
+    if estado == "es_tu":
+        if entrada == "yo_si" or norm in ("si", "sí", "si soy yo"):
+            return _confirmar(b, negocio, servicios, proveedores, {**datos, "cliente_id": datos["posible"]})
+        if entrada == "yo_no" or norm.startswith("no"):
+            return _confirmar(b, negocio, servicios, proveedores, datos)
 
     if estado == "confirmar":
         if entrada == "ok_si" or norm in ("si", "sí"):
@@ -358,6 +376,12 @@ def _agendar(b, negocio, servicios, proveedores, tel10, datos):
     paciente = buscar_paciente(b, tel10)
     if paciente:
         cid = paciente["id"]
+    elif datos.get("cliente_id"):
+        # Paciente que ya existia con otro numero: se queda su expediente y se actualiza su WhatsApp
+        cid = datos["cliente_id"]
+        viejo = b.uno("SELECT telefono, notas FROM clientes WHERE id = ?", (cid,)) or {}
+        nota = ((viejo.get("notas") or "") + f"\nTeléfono anterior: {viejo.get('telefono') or '-'}").strip()
+        b.q("UPDATE clientes SET telefono = ?, notas = ? WHERE id = ?", (tel10, nota, cid))
     else:
         _, cid = b.q("INSERT INTO clientes (nombre, telefono, email, notas) VALUES (?, ?, '', 'Registrado por WhatsApp')",
                      (datos.get("nombre") or "Paciente WhatsApp", tel10))

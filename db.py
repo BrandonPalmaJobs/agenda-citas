@@ -507,6 +507,12 @@ def editar_cita(cita_id, cliente_id, proveedor_id, servicio_id, fecha, hora_inic
         )
 
 
+def reiniciar_recordatorio(cita_id):
+    """Tras cambiar fecha/hora: el paciente debe volver a recibir recordatorio y confirmar."""
+    with get_conn() as conn:
+        conn.execute("UPDATE citas SET confirmada = 0, recordatorio_enviado = 0 WHERE id = ?", (cita_id,))
+
+
 def list_citas(fecha=None, proveedor_id=None):
     with get_conn() as conn:
         q = """SELECT citas.*, clientes.nombre AS cliente_nombre, clientes.telefono AS cliente_telefono,
@@ -538,6 +544,18 @@ def firma_citas(fecha):
                               COALESCE(SUM(COALESCE(confirmada, 0)), 0)
                               FROM citas WHERE fecha = ?""", (fecha,)).fetchone()
         return (maximo, tuple(dia))
+
+
+def resumen_whatsapp(fecha_ini, fecha_fin):
+    """Citas del rango (sin canceladas): total, cuantas llegaron por WhatsApp y
+    cuantas confirmo el paciente desde el recordatorio."""
+    with get_conn() as conn:
+        r = conn.execute("""SELECT COUNT(*),
+                                   COALESCE(SUM(CASE WHEN notas LIKE '%WhatsApp%' THEN 1 ELSE 0 END), 0),
+                                   COALESCE(SUM(CASE WHEN confirmada = 1 THEN 1 ELSE 0 END), 0)
+                            FROM citas WHERE fecha BETWEEN ? AND ? AND estado != 'Cancelada'""",
+                         (fecha_ini, fecha_fin)).fetchone()
+        return {"total": r[0], "whatsapp": r[1], "confirmadas": r[2]}
 
 
 def citas_nuevas_desde(id_minimo):

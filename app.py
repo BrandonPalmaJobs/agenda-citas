@@ -860,6 +860,22 @@ if SUSCRIPCION["aviso"]:
     st.warning(SUSCRIPCION["aviso"] + (f" ({contacto})" if contacto else ""))
 
 
+def avisar_paciente(tipo, c):
+    """Manda por WhatsApp el aviso de cita cancelada/cambiada (solo citas de hoy en adelante)."""
+    if not c.get("cliente_telefono") or c["fecha"] < hoy_negocio().isoformat():
+        return
+    import whatsapp
+    if not whatsapp.credenciales_configuradas():
+        return
+    nombre = (c.get("cliente_nombre") or "").split(" ")[0] or "paciente"
+    valores = [nombre, negocio["nombre"], whatsapp.fecha_bonita(c["fecha"]), c["hora_inicio"]]
+    if tipo == "reprogramada":
+        valores.append(c.get("proveedor_nombre") or "nuestro equipo")
+    ok, error = whatsapp.avisar_cambio(tipo, c["cliente_telefono"], *valores)
+    st.session_state.setdefault("avisos_nuevas", []).append(
+        "📲 Se le avisó al paciente por WhatsApp." if ok else f"No se pudo avisar por WhatsApp al paciente ({(error or '')[:80]}).")
+
+
 # ---------------------------------------------------------------- Agenda del dia
 if pagina == "Agenda del día":
     st.title(f"{V['icono']} Agenda del día")
@@ -900,8 +916,11 @@ if pagina == "Agenda del día":
 
     _vigilar_agenda(fecha_sel.isoformat())
     for _aviso in st.session_state.pop("avisos_nuevas", []):
-        st.toast(_aviso, icon="🔔")
-        st.success(_aviso)
+        if _aviso.startswith("No se pudo"):
+            st.warning(_aviso)
+        else:
+            st.toast(_aviso, icon="📲" if _aviso.startswith("📲") else "🔔")
+            st.success(_aviso)
 
     # Citas que siguen "Agendada" aunque su hora de fin ya paso: hay que
     # registrarlas (completada / no asistio / cancelada)
@@ -971,6 +990,7 @@ if pagina == "Agenda del día":
                 if b4.button("Cancelar", key=f"canc_{c['id']}", use_container_width=True):
                     db.cambiar_estado_cita(c["id"], "Cancelada")
                     google_calendar.borrar_evento(c["evento_calendar_id"])
+                    avisar_paciente("cancelada", c)
                     st.rerun()
 
             if st.session_state.editando_cita == c["id"]:
@@ -1010,6 +1030,11 @@ if pagina == "Agenda del día":
                         try:
                             db.editar_cita(c["id"], cliente_id_e, proveedor_id_e, servicio_id_e,
                                             fecha_e.isoformat(), hora_e, duracion, notas_e)
+                            if (fecha_e.isoformat(), hora_e, proveedor_id_e) != (c["fecha"], c["hora_inicio"], c["proveedor_id"]):
+                                db.reiniciar_recordatorio(c["id"])
+                                nuevo_doc = next(p["nombre"] for p in todos_proveedores if p["id"] == proveedor_id_e)
+                                avisar_paciente("reprogramada", {**c, "fecha": fecha_e.isoformat(),
+                                                                 "hora_inicio": hora_e, "proveedor_nombre": nuevo_doc})
                             st.session_state.editando_cita = None
                             st.success("Cita actualizada.")
                             st.rerun()
@@ -1331,6 +1356,13 @@ elif pagina == "Estadísticas":
     if fecha_inicio > fecha_fin:
         st.error("La fecha 'Desde' no puede ser después de 'Hasta'.")
     else:
+        _wa = db.resumen_whatsapp(fecha_inicio.isoformat(), fecha_fin.isoformat())
+        st.markdown("##### 💬 WhatsApp")
+        w1, w2, w3 = st.columns(3)
+        w1.metric("Citas agendadas por WhatsApp", _wa["whatsapp"])
+        w2.metric("Del total de citas", f"{(_wa['whatsapp'] / _wa['total'] * 100) if _wa['total'] else 0:.0f}%")
+        w3.metric("Confirmadas por el paciente", _wa["confirmadas"])
+        st.caption("Citas del rango (sin contar canceladas). Confirmadas = el paciente tocó «Confirmo» en el recordatorio.")
         agrupar_por = st.radio("Agrupar gráficas por:", ["Día", "Semana", "Quincena", "Mes"], horizontal=True)
 
         registros = db.citas_finalizadas(fecha_inicio.isoformat(), fecha_fin.isoformat())

@@ -28,6 +28,13 @@ def credenciales():
     numero = os.environ.get("WHATSAPP_PHONE_NUMBER_ID")
     if token and numero:
         return token, numero
+    try:  # app de Streamlit: Secrets
+        import streamlit as st
+        token, numero = st.secrets.get("WHATSAPP_TOKEN"), st.secrets.get("WHATSAPP_PHONE_NUMBER_ID")
+        if token and numero:
+            return token, str(numero)
+    except Exception:
+        pass
     try:
         import recordatorios_config as c
         return (c.WHATSAPP_ACCESS_TOKEN or None), (c.WHATSAPP_PHONE_NUMBER_ID or None)
@@ -92,3 +99,39 @@ def enviar_recordatorio_simulado(telefono, cliente_nombre, negocio_nombre, fecha
 def enviar_texto(telefono, texto):
     """Texto libre: solo funciona si el paciente escribio en las ultimas 24 h."""
     return _enviar({"to": normalizar_telefono(telefono), "type": "text", "text": {"body": texto}})
+
+
+MESES = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+         "septiembre", "octubre", "noviembre", "diciembre"]
+DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+
+
+def fecha_bonita(fecha_iso):
+    from datetime import date
+    f = date.fromisoformat(fecha_iso)
+    return f"{DIAS[f.weekday()]} {f.day} de {MESES[f.month]}"
+
+
+# Avisos cuando la CLINICA cancela o cambia una cita (plantillas cita_cancelada y
+# cita_reprogramada; si Meta aun no las aprueba, se intenta como texto normal,
+# que solo llega si el paciente escribio en las ultimas 24 h).
+AVISOS = {
+    "cancelada": ("cita_cancelada",
+                  "Hola {0}, te avisamos que tu cita en {1} del {2} a las {3} fue cancelada. "
+                  "Si quieres agendar otra fecha, responde a este mensaje o escribe hola."),
+    "reprogramada": ("cita_reprogramada",
+                     "Hola {0}, tu cita en {1} cambió de fecha. Nueva cita: {2} a las {3} con {4}. "
+                     "Si no te acomoda, responde a este mensaje o escribe hola."),
+}
+
+
+def avisar_cambio(tipo, telefono, *valores):
+    plantilla, texto = AVISOS[tipo]
+    valores = [str(v) for v in valores]
+    ok, error = _enviar({"to": normalizar_telefono(telefono), "type": "template",
+                         "template": {"name": plantilla, "language": {"code": IDIOMA}, "components": [
+                             {"type": "body", "parameters": [{"type": "text", "text": v} for v in valores]}]}})
+    if ok:
+        return True, None
+    ok2, error2 = enviar_texto(telefono, texto.format(*valores))
+    return (True, None) if ok2 else (False, error)
