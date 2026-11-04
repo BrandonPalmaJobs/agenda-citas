@@ -1,0 +1,20 @@
+# Revisa que los dominios de correo existan y reciban correo (registro MX).
+name: Verificar dominios de correo
+on:
+  workflow_dispatch:
+    inputs:
+      dominios:
+        description: "Dominios separados por espacio"
+        required: true
+jobs:
+  mx:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          DOMINIOS: ${{ inputs.dominios }}
+        run: |
+          for d in $DOMINIOS; do
+            mx=$(dig +short +time=3 +tries=2 MX "$d" | head -1)
+            if [ -z "$mx" ]; then a=$(dig +short +time=3 +tries=2 A "$d" | head -1); [ -n "$a" ] && mx="A:$a"; fi
+            echo "RES|$d|${mx:-NINGUNO}"
+          done
