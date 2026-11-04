@@ -234,6 +234,11 @@ h1 {{ font-weight: 800 !important; }}
     border: none !important; border-radius: 8px !important; color: #04201D !important;
 }}
 [data-testid="stSidebar"] [data-testid="stCode"] button * {{ color: #04201D !important; fill: #04201D !important; }}
+[data-testid="stSidebar"] [data-testid="stLinkButton"] a {{
+    background: #16A34A !important; border: 0 !important; color: #fff !important; font-weight: 700;
+}}
+[data-testid="stSidebar"] [data-testid="stLinkButton"] a * {{ color: #fff !important; }}
+[data-testid="stSidebar"] [data-testid="stLinkButton"] a:hover {{ background: #15803D !important; }}
 [data-testid="stSidebar"] .ak-link-ayuda {{ color: #CBD5E1 !important; font-size: .82rem; margin: 2px 0 8px; }}
 
 /* Componentes propios (HTML) */
