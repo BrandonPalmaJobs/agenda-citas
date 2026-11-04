@@ -153,9 +153,22 @@ def mis_citas(b, tel10):
 # ------------------------------------------------------------------ respuestas
 # Cada respuesta es un dict: {"texto": ...} o {"texto", "botones": [(id, titulo)]}
 # o {"texto", "lista": [(id, titulo, descripcion)], "boton_lista": "Ver opciones"}
-def menu(nombre_clinica, saludo=True):
+URL_DEMO = os.environ.get("BOT_URL_PLATAFORMA", "https://clinicadentalaikasolutions.streamlit.app/")
+
+
+def link_web(r, slug):
+    """Pagina donde los pacientes ven todos los horarios: la app propia de la clinica
+    (url_app en la lista central) o la plataforma compartida con ?negocio=slug."""
+    c = r.uno("SELECT url_app FROM clinicas WHERE slug = ?", (slug,)) or {}
+    url = (c.get("url_app") or "").strip()
+    return url if url else f"{URL_DEMO.rstrip('/')}/?negocio={slug}"
+
+
+def menu(nombre_clinica, saludo=True, web=None):
     t = (f"¡Hola! 👋 Soy el asistente de *{nombre_clinica}*.\n¿Qué quieres hacer?" if saludo
          else "¿Te ayudo con algo más?")
+    if saludo and web:
+        t += f"\n\n🌐 Si prefieres ver todos los horarios y precios: {web}"
     return {"texto": t, "botones": [("m_agendar", "📅 Agendar cita"), ("m_mis", "🗓️ Mis citas"),
                                     ("m_cancelar", "❌ Cancelar cita")]}
 
@@ -183,7 +196,7 @@ def responder(r, tel, texto, boton_id, msg_id):
     todas = clinicas(r)
     slug = est.get("clinica")
     for c in todas:
-        if _sin_acentos(c["nombre"]) in norm and len(c["nombre"]) > 3:
+        if (_sin_acentos(c["nombre"]) in norm and len(c["nombre"]) > 3) or f"({c['slug']})" in norm:
             slug = c["slug"]
     if not slug:
         slug = os.environ.get("BOT_CLINICA") or (todas[0]["slug"] if len(todas) == 1 else None)
@@ -194,11 +207,16 @@ def responder(r, tel, texto, boton_id, msg_id):
     negocio = b.uno("SELECT * FROM negocio WHERE id = 1")
     estado = est["estado"] if est.get("clinica") == slug else "inicio"
 
-    if norm in ("hola", "menu", "inicio", "buenas", "buenos dias", "buenas tardes", "buenas noches", "hi") \
+    if norm.startswith("hola") or norm in ("hola", "menu", "inicio", "buenas", "buenos dias", "buenas tardes", "buenas noches", "hi") \
             or estado == "inicio" and not boton_id:
         estado, datos = "menu", {}
         guardar_estado(r, tel, slug, estado, datos, msg_id)
-        return [menu(negocio["nombre"])]
+        return [menu(negocio["nombre"], web=link_web(r, slug))]
+
+    if norm in ("web", "link", "pagina", "horarios", "ver horarios"):
+        guardar_estado(r, tel, slug, "menu", {}, msg_id)
+        return [{"texto": f"🌐 Aquí ves todos los horarios, precios y especialistas:\n{link_web(r, slug)}"},
+                menu(negocio["nombre"], False)]
 
     resp, estado, datos = _flujo(b, negocio, tel10, estado, datos, entrada, norm)
     guardar_estado(r, tel, slug, estado, datos, msg_id)

@@ -391,6 +391,72 @@ def link_publico():
     return f"{esquema}://{host}/" + (f"?negocio={NEGOCIO_SLUG}" if NEGOCIO_SLUG else "")
 
 
+def _secreto(clave, defecto=""):
+    try:
+        return str(st.secrets.get(clave, defecto) or defecto)
+    except Exception:
+        return defecto
+
+
+def link_whatsapp_bot():
+    """Abre WhatsApp con el bot de Aika y un mensaje que le dice al bot de que clinica es."""
+    from urllib.parse import quote
+    numero = _secreto("whatsapp_bot_numero", "15550395993")  # numero de prueba de Aika Citas
+    slug = NEGOCIO_SLUG or _secreto("slug")
+    texto = f"Hola, quiero agendar en {negocio['nombre']}" + (f" ({slug})" if slug else "")
+    return f"https://wa.me/{numero}?text={quote(texto)}"
+
+
+@st.cache_data(show_spinner=False)
+def imagen_qr(link, nombre, logo_b64=None, color="#0F766E"):
+    """PNG listo para imprimir: logo, nombre de la clinica, QR al link y texto."""
+    import qrcode
+    from PIL import Image, ImageDraw, ImageFont
+    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=18, border=2)
+    qr.add_data(link)
+    qr.make(fit=True)
+    img_qr = qr.make_image(fill_color=color, back_color="white").convert("RGB")
+    W = 1200
+    lienzo = Image.new("RGB", (W, 1700), "white")
+    d = ImageDraw.Draw(lienzo)
+
+    def fuente(tam):
+        for f in ("DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "arial.ttf"):
+            try:
+                return ImageFont.truetype(f, tam)
+            except Exception:
+                pass
+        return ImageFont.load_default()
+
+    def centrado(texto, y, tam, rel=(15, 23, 42)):
+        f = fuente(tam)
+        ancho = d.textlength(texto, font=f)
+        d.text(((W - ancho) / 2, y), texto, font=f, fill=rel)
+
+    y = 70
+    if logo_b64:
+        try:
+            logo = Image.open(io.BytesIO(base64.b64decode(logo_b64))).convert("RGBA")
+            logo.thumbnail((260, 260))
+            lienzo.paste(logo, ((W - logo.width) // 2, y), logo)
+            y += logo.height + 30
+        except Exception:
+            pass
+    centrado(nombre[:40], y, 56)
+    y += 110
+    centrado("Agenda tu cita aquí", y, 64, (15, 118, 110))
+    y += 110
+    img_qr = img_qr.resize((820, 820))
+    lienzo.paste(img_qr, ((W - 820) // 2, y))
+    y += 860
+    centrado("Escanea con la cámara de tu celular", y, 40, (71, 85, 105))
+    alto = y + 120
+    lienzo = lienzo.crop((0, 0, W, alto))
+    salida = io.BytesIO()
+    lienzo.save(salida, format="PNG")
+    return salida.getvalue()
+
+
 MESES_NOMBRE = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
                 "septiembre", "octubre", "noviembre", "diciembre"]
 
@@ -562,6 +628,8 @@ def pagina_reservar_publica():
                 fecha_sel.isoformat(), hora_sel, duracion, notas)
             if error_calendar:
                 st.caption(f"(La cita quedó guardada. No se pudo mandar la invitación de Google Calendar: {error_calendar})")
+            st.caption("Te mandaremos un recordatorio por WhatsApp antes de tu cita.")
+            st.link_button("💬 ¿Dudas? Escríbenos por WhatsApp", link_whatsapp_bot(), type="primary")
 
 
         # ---- 5. Datos del paciente
@@ -848,6 +916,14 @@ with st.sidebar.expander(f"🔗 Link para que agenden los {V['clientes']}", expa
     st.markdown('<div class="ak-link-ayuda">Compártelo por WhatsApp o redes. '
                 'Cópialo con el botón verde de la derecha.</div>', unsafe_allow_html=True)
     st.code(link_publico(), language=None)
+    try:
+        st.download_button("🖨️ Descargar QR para la recepción",
+                           data=imagen_qr(link_publico(), negocio["nombre"], negocio.get("logo_base64"),
+                                          negocio.get("color_marca") or "#0F766E"),
+                           file_name="QR-agenda-tu-cita.png", mime="image/png", use_container_width=True)
+    except Exception:
+        pass
+    st.link_button("💬 Link a tu WhatsApp de citas", link_whatsapp_bot(), use_container_width=True)
 if st.sidebar.button("Cerrar sesión", use_container_width=True):
     st.session_state.staff_autenticado = False
     st.session_state.rol = None
