@@ -1,0 +1,3 @@
+ERROR VISIBLE en reservar : alerta
+QR descargado OK
+ERROR VISIBLE en reservar : alerta
