@@ -886,7 +886,7 @@ if not st.session_state.staff_autenticado:
             st.session_state.rol = "staff"
             st.rerun()
         else:
-            st.error("Clave incorrecta (revisa .streamlit/secrets.toml).")
+            st.error("Clave incorrecta. Revisa que esté bien escrita.")
     st.stop()
 
 if negocio.get("logo_base64"):
