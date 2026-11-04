@@ -138,6 +138,17 @@ def _init_db():
                 autor TEXT,
                 texto TEXT NOT NULL,
                 creada_el TEXT NOT NULL)""")
+        # Avisos de WhatsApp por mandar (los manda el bot de Vercel; aqui no hay token)
+        conn.execute("""CREATE TABLE IF NOT EXISTS avisos_whatsapp (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cita_id INTEGER,
+                tipo TEXT NOT NULL,
+                telefono TEXT NOT NULL,
+                valores TEXT NOT NULL,
+                creado_el TEXT NOT NULL,
+                estado TEXT NOT NULL DEFAULT 'pendiente',
+                intentos INTEGER NOT NULL DEFAULT 0,
+                error TEXT)""")
         columnas_negocio = {row["name"] for row in conn.execute("PRAGMA table_info(negocio)")}
         if "descanso_inicio" not in columnas_negocio:
             conn.execute("ALTER TABLE negocio ADD COLUMN descanso_inicio TEXT")
@@ -505,6 +516,14 @@ def editar_cita(cita_id, cliente_id, proveedor_id, servicio_id, fecha, hora_inic
                hora_fin=?, notas=? WHERE id=?""",
             (cliente_id, proveedor_id, servicio_id, fecha, hora_inicio, hora_fin, notas, cita_id),
         )
+
+
+def encolar_aviso(cita_id, tipo, telefono, valores, creado_el):
+    """Deja anotado un aviso de WhatsApp; el bot de Vercel lo manda en unos minutos."""
+    import json
+    with get_conn() as conn:
+        conn.execute("""INSERT INTO avisos_whatsapp (cita_id, tipo, telefono, valores, creado_el)
+                        VALUES (?, ?, ?, ?, ?)""", (cita_id, tipo, telefono, json.dumps(valores, ensure_ascii=False), creado_el))
 
 
 def reiniciar_recordatorio(cita_id):

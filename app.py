@@ -861,19 +861,21 @@ if SUSCRIPCION["aviso"]:
 
 
 def avisar_paciente(tipo, c):
-    """Manda por WhatsApp el aviso de cita cancelada/cambiada (solo citas de hoy en adelante)."""
+    """Anota el aviso de cita cancelada/cambiada; el bot lo manda por WhatsApp en unos minutos.
+    (El panel no guarda el token de WhatsApp: vive solo en el bot de Vercel.)"""
     if not c.get("cliente_telefono") or c["fecha"] < hoy_negocio().isoformat():
         return
     import whatsapp
-    if not whatsapp.credenciales_configuradas():
-        return
     nombre = (c.get("cliente_nombre") or "").split(" ")[0] or "paciente"
     valores = [nombre, negocio["nombre"], whatsapp.fecha_bonita(c["fecha"]), c["hora_inicio"]]
     if tipo == "reprogramada":
         valores.append(c.get("proveedor_nombre") or "nuestro equipo")
-    ok, error = whatsapp.avisar_cambio(tipo, c["cliente_telefono"], *valores)
-    st.session_state.setdefault("avisos_nuevas", []).append(
-        "📲 Se le avisó al paciente por WhatsApp." if ok else f"No se pudo avisar por WhatsApp al paciente ({(error or '')[:80]}).")
+    try:
+        db.encolar_aviso(c["id"], tipo, c["cliente_telefono"], valores, ahora_negocio().isoformat(timespec="seconds"))
+        st.session_state.setdefault("avisos_nuevas", []).append(
+            "📲 Se le avisará al paciente por WhatsApp en unos minutos.")
+    except Exception as e:
+        st.session_state.setdefault("avisos_nuevas", []).append(f"No se pudo anotar el aviso de WhatsApp ({str(e)[:80]}).")
 
 
 # ---------------------------------------------------------------- Agenda del dia
