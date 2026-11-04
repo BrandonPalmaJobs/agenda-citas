@@ -93,7 +93,9 @@ def app(environ, start_response):
     q = parse_qs(environ.get("QUERY_STRING", ""))
     codigo, texto = "200 OK", "Bot de Aika Citas funcionando"
     if environ.get("PATH_INFO", "").rstrip("/") == "/recordatorios":
-        if q.get("clave", [""])[0] and q.get("clave", [""])[0] == os.environ.get("WHATSAPP_VERIFY_TOKEN"):
+        clave = q.get("clave", [""])[0]
+        validas = {os.environ.get("CRON_CLAVE"), os.environ.get("WHATSAPP_VERIFY_TOKEN")} - {None, ""}
+        if clave and clave in validas:
             import recordatorios
             try:
                 texto = recordatorios.correr(int(q.get("horas", [recordatorios.HORAS])[0]))
