@@ -2,6 +2,12 @@
 name: Extraer dentistas DENUE
 on:
   workflow_dispatch:
+    inputs:
+      clave:
+        description: "Clave para cifrar el resultado"
+        required: true
+permissions:
+  contents: write
 jobs:
   extraer:
     runs-on: ubuntu-latest
@@ -19,8 +25,14 @@ jobs:
           ls -la denue.zip
           python prospeccion/extraer_dentistas.py denue.zip dentistas.csv
           gzip -9 dentistas.csv
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dentistas
-          path: dentistas.csv.gz
-          retention-days: 1
+      - name: Guardar cifrado en rama temporal
+        env:
+          CLAVE: ${{ inputs.clave }}
+        run: |
+          echo "::add-mask::$CLAVE"
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in dentistas.csv.gz -out dentistas.enc -pass env:CLAVE
+          mkdir salida && mv dentistas.enc salida/ && cd salida
+          git init -q && git checkout -q -b tmp-datos
+          git config user.name "bot" && git config user.email "bot@users.noreply.github.com"
+          git add . && git commit -q -m "datos cifrados temporales"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" tmp-datos
