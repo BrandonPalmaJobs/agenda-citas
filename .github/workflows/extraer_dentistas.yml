@@ -8,7 +8,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          curl -sSL -A "Mozilla/5.0" -o denue.zip https://www.inegi.org.mx/contenidos/masiva/denue/denue_00_62_csv.zip
+          # El servidor del INEGI no manda su certificado intermedio: se baja por AIA y se agrega
+          echo | openssl s_client -connect www.inegi.org.mx:443 -servername www.inegi.org.mx 2>/dev/null | openssl x509 > hoja.pem
+          AIA=$(openssl x509 -in hoja.pem -noout -text | grep -o 'CA Issuers - URI:[^ ]*' | head -1 | sed 's/CA Issuers - URI://')
+          echo "intermedio: $AIA"
+          curl -sSL "$AIA" -o inter.bin
+          (openssl x509 -inform DER -in inter.bin 2>/dev/null || openssl x509 -in inter.bin) > inter.pem
+          cat /etc/ssl/certs/ca-certificates.crt inter.pem > bundle.pem
+          curl -sSL --cacert bundle.pem -A "Mozilla/5.0" -o denue.zip https://www.inegi.org.mx/contenidos/masiva/denue/denue_00_62_csv.zip
           ls -la denue.zip
           python prospeccion/extraer_dentistas.py denue.zip dentistas.csv
           gzip -9 dentistas.csv
