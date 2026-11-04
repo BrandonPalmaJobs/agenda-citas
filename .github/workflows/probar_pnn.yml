@@ -1,0 +1,11 @@
+name: Probar descarga PNN
+on:
+  workflow_dispatch:
+jobs:
+  ver:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for u in "https://sns.ift.org.mx:8081/sns-frontend/planes-numeracion/descarga-publica.xhtml" "https://sns.crt.gob.mx:8081/sns-frontend/planes-numeracion/descarga-publica.xhtml" "https://sns.crt.gob.mx/sns-frontend/planes-numeracion/descarga-publica.xhtml"; do
+            echo "=== $u"; curl -skL -m 40 -c cj.txt -A "Mozilla/5.0" "$u" -o p.html -w "%{http_code} %{url_effective}\n"; grep -oiE '(href|id|name|action)="[^"]*"' p.html | grep -iE 'pnn|descarg|csv|zip|form|btn|button|javax' | head -40
+          done
