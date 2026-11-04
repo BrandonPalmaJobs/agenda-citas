@@ -8,4 +8,4 @@ jobs:
   borrar:
     runs-on: ubuntu-latest
     steps:
-      - run: git push "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" --delete tmp-datos || true
+      - run: git init -q && git push "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" --delete tmp-datos || true
