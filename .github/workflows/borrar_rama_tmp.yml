@@ -1,0 +1,11 @@
+# Borra la rama temporal de datos (tmp-datos).
+name: Borrar rama temporal
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  borrar:
+    runs-on: ubuntu-latest
+    steps:
+      - run: git push "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" --delete tmp-datos || true
