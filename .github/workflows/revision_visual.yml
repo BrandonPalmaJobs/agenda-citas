@@ -47,6 +47,14 @@ jobs:
                   pg.screenshot(path=f"{nombre}_02_login.png", full_page=True)
                   pg.get_by_label("Clave de acceso").fill("prueba-dueno-ci")
                   pg.get_by_role("button", name="Entrar").click(); esperar(pg, 6000)
+                  if not movil:
+                      try:
+                          with pg.expect_download(timeout=15000) as dl:
+                              pg.get_by_role("button", name="Descargar QR").click()
+                          dl.value.save_as("qr_descargado.png"); print("QR descargado OK")
+                      except Exception as e:
+                          print("QR FALLO:", e)
+                      esperar(pg, 3000)
                   for i, nom in enumerate(PAG):
                       if movil:
                           for sel in ['[data-testid="stExpandSidebarButton"]', '[data-testid="stSidebarCollapsedControl"] button']:
