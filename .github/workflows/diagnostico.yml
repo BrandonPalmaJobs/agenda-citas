@@ -21,6 +21,7 @@ jobs:
           python - <<'PY'
           import os, db, registro
           for c in registro.listar():
+              print("CLINICA", c["slug"], c.get("nombre"), c.get("url_app"), c.get("activa"))
               db.usar_turso(c["turso_database_url"], c["turso_auth_token"])
               with db.get_conn() as conn:
                   for r in conn.execute("""SELECT citas.id, fecha, hora_inicio, estado, confirmada, recordatorio_enviado, citas.notas
