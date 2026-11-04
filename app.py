@@ -391,7 +391,7 @@ def link_publico():
     return f"{esquema}://{host}/" + (f"?negocio={NEGOCIO_SLUG}" if NEGOCIO_SLUG else "")
 
 
-def _secreto(clave, defecto=""):
+def _secreto_global(clave, defecto=""):
     try:
         return str(st.secrets.get(clave, defecto) or defecto)
     except Exception:
@@ -401,8 +401,8 @@ def _secreto(clave, defecto=""):
 def link_whatsapp_bot():
     """Abre WhatsApp con el bot de Aika y un mensaje que le dice al bot de que clinica es."""
     from urllib.parse import quote
-    numero = _secreto("whatsapp_bot_numero", "15550395993")  # numero de prueba de Aika Citas
-    slug = NEGOCIO_SLUG or _secreto("slug")
+    numero = _secreto_global("whatsapp_bot_numero", "15550395993")  # numero de prueba de Aika Citas
+    slug = NEGOCIO_SLUG or _secreto_global("slug")
     texto = f"Hola, quiero agendar en {negocio['nombre']}" + (f" ({slug})" if slug else "")
     return f"https://wa.me/{numero}?text={quote(texto)}"
 
