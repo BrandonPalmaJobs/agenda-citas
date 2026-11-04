@@ -1,0 +1,19 @@
+# Baja el DENUE (INEGI, sector salud) y saca los consultorios dentales. Resultado como artefacto temporal.
+name: Extraer dentistas DENUE
+on:
+  workflow_dispatch:
+jobs:
+  extraer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          curl -sSL -A "Mozilla/5.0" -o denue.zip https://www.inegi.org.mx/contenidos/masiva/denue/denue_00_62_csv.zip
+          ls -la denue.zip
+          python prospeccion/extraer_dentistas.py denue.zip dentistas.csv
+          gzip -9 dentistas.csv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dentistas
+          path: dentistas.csv.gz
+          retention-days: 1
