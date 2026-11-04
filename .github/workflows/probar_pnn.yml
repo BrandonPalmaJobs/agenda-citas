@@ -1,11 +1,20 @@
-name: Probar descarga PNN
+# Revisa que los dominios de correo existan y puedan recibir correo (registro MX).
+name: Verificar dominios de correo
 on:
   workflow_dispatch:
+    inputs:
+      dominios:
+        description: "Dominios separados por espacio"
+        required: true
 jobs:
-  ver:
+  mx:
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          for u in "https://sns.ift.org.mx:8081/sns-frontend/planes-numeracion/descarga-publica.xhtml" "https://sns.crt.gob.mx:8081/sns-frontend/planes-numeracion/descarga-publica.xhtml" "https://sns.crt.gob.mx/sns-frontend/planes-numeracion/descarga-publica.xhtml"; do
-            echo "=== $u"; curl -skL -m 40 -c cj.txt -A "Mozilla/5.0" "$u" -o p.html -w "%{http_code} %{url_effective}\n"; grep -oiE '(href|id|name|action)="[^"]*"' p.html | grep -iE 'pnn|descarg|csv|zip|form|btn|button|javax' | head -40
+      - env:
+          DOMINIOS: ${{ inputs.dominios }}
+        run: |
+          for d in $DOMINIOS; do
+            mx=$(dig +short +time=3 +tries=2 MX "$d" | head -1)
+            if [ -z "$mx" ]; then a=$(dig +short +time=3 +tries=2 A "$d" | head -1); [ -n "$a" ] && mx="A:$a"; fi
+            echo "RES|$d|${mx:-NINGUNO}"
           done
