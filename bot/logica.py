@@ -169,6 +169,8 @@ def menu(nombre_clinica, saludo=True, web=None):
          else "¿Te ayudo con algo más?")
     if saludo and web:
         t += f"\n\n🌐 Si prefieres ver todos los horarios y precios: {web}"
+    if saludo:
+        t += "\n_¿Es otro consultorio? Escribe *cambiar consultorio*._"
     return {"texto": t, "botones": [("m_agendar", "📅 Agendar cita"), ("m_mis", "🗓️ Mis citas"),
                                     ("m_cancelar", "❌ Cancelar cita")]}
 
@@ -195,14 +197,21 @@ def responder(r, tel, texto, boton_id, msg_id):
     # Elegir clinica
     todas = clinicas(r)
     slug = est.get("clinica")
+    if norm in ("cambiar clinica", "otra clinica", "cambiar consultorio", "otro consultorio"):
+        slug = None
     for c in todas:
-        if (_sin_acentos(c["nombre"]) in norm and len(c["nombre"]) > 3) or f"({c['slug']})" in norm:
+        if (_sin_acentos(nombre_clinica(r, c)) in norm and len(nombre_clinica(r, c)) > 3) or f"({c['slug']})" in norm:
             slug = c["slug"]
-    if not slug:
-        slug = os.environ.get("BOT_CLINICA") or (todas[0]["slug"] if len(todas) == 1 else None)
+    if not slug and est.get("estado") == "elegir_clinica" and est.get("clinica") is None:
+        slug = _clinica_elegida(r, entrada, norm, est["datos"].get("opciones", []), todas)
+        if slug:
+            guardar_estado(r, tel, slug, "inicio", {}, msg_id)
+            est = {"clinica": slug, "estado": "inicio", "datos": {}}
+            norm = "hola"  # al elegirla, mostrar su menu
+    if not slug and len(todas) == 1:
+        slug = todas[0]["slug"]
     if not slug or not any(c["slug"] == slug for c in todas):
-        guardar_estado(r, tel, None, "inicio", {}, msg_id)
-        return [{"texto": "Hola 👋 ¿Con qué clínica quieres agendar? Escribe su nombre."}]
+        return _preguntar_clinica(r, tel, tel10, norm, todas, msg_id)
     b = base_clinica(r, slug)
     negocio = b.uno("SELECT * FROM negocio WHERE id = 1")
     estado = est["estado"] if est.get("clinica") == slug else "inicio"
@@ -221,6 +230,63 @@ def responder(r, tel, texto, boton_id, msg_id):
     resp, estado, datos = _flujo(b, negocio, tel10, estado, datos, entrada, norm)
     guardar_estado(r, tel, slug, estado, datos, msg_id)
     return resp
+
+
+def nombre_clinica(r, c):
+    """Nombre para mostrar: el de la lista central, o el de su base si ahi solo esta el codigo."""
+    n = (c.get("nombre") or "").strip()
+    if n and n.lower() != c["slug"].lower():
+        return n
+    if "_nombre_real" not in c:
+        try:
+            neg = base_clinica(r, c["slug"]).uno("SELECT nombre FROM negocio WHERE id = 1") or {}
+            c["_nombre_real"] = neg.get("nombre") or c["slug"]
+        except Exception:
+            c["_nombre_real"] = c["slug"]
+    return c["_nombre_real"]
+
+
+def _clinicas_del_paciente(r, tel10, todas):
+    """Clinicas donde ese telefono ya es paciente (solo se revisa si son pocas)."""
+    if len(todas) > 30:
+        return []
+    suyas = []
+    for c in todas:
+        try:
+            if buscar_paciente(base_clinica(r, c["slug"]), tel10):
+                suyas.append(c["slug"])
+        except Exception:
+            pass
+    return suyas
+
+
+def _preguntar_clinica(r, tel, tel10, norm, todas, msg_id):
+    """El paciente no dijo de que clinica es: le preguntamos."""
+    if not todas:
+        return [{"texto": "Por ahora no hay consultorios disponibles. Intenta más tarde."}]
+    suyas = _clinicas_del_paciente(r, tel10, todas)
+    if len(todas) <= 10 or suyas:
+        orden = sorted(todas, key=lambda c: (c["slug"] not in suyas, nombre_clinica(r, c)))[:10]
+        filas = [(f"c_{c['slug']}", nombre_clinica(r, c)[:24], "Ya eres paciente" if c["slug"] in suyas else "")
+                 for c in orden]
+        guardar_estado(r, tel, None, "elegir_clinica", {"opciones": [c["slug"] for c in orden]}, msg_id)
+        extra = "\nSi no aparece, escribe su nombre." if len(todas) > len(orden) else ""
+        return [{"texto": "¡Hola! 👋 ¿Con qué consultorio quieres tu cita?" + extra,
+                 "lista": filas, "boton_lista": "Ver consultorios"}]
+    guardar_estado(r, tel, None, "elegir_clinica", {"opciones": []}, msg_id)
+    return [{"texto": "¡Hola! 👋 ¿Con qué consultorio quieres tu cita? Escríbeme su nombre."}]
+
+
+def _clinica_elegida(r, entrada, norm, opciones, todas):
+    if entrada.startswith("c_") and any(c["slug"] == entrada[2:] for c in todas):
+        return entrada[2:]
+    if entrada.isdigit() and 1 <= int(entrada) <= len(opciones):
+        return opciones[int(entrada) - 1]
+    if len(norm) >= 3:
+        hallados = [c["slug"] for c in todas if norm in _sin_acentos(nombre_clinica(r, c))]
+        if len(hallados) == 1:
+            return hallados[0]
+    return None
 
 
 def _accion_recordatorio(b, accion, cita_id, tel10):
