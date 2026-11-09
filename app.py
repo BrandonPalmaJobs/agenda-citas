@@ -1306,6 +1306,29 @@ elif pagina == "Personal":
 elif pagina == "Configuración":
     st.title("⚙️ Configuración del negocio")
 
+    with st.expander("📲 Configura tu WhatsApp Business para que tus pacientes agenden solos", expanded=False):
+        _wa, _web, _nom = link_whatsapp_bot(), link_publico(), negocio["nombre"]
+        st.markdown(
+            "Si tu consultorio usa **WhatsApp Business** (app gratis), configura estos mensajes "
+            "y cada paciente que te escriba recibirá tu link para agendar. **Conservas tu número y tus chats.**\n\n"
+            "En la app: **Ajustes → Herramientas para la empresa**. Copia cada texto con el botón de la derecha.")
+        st.markdown("**1. Mensaje de bienvenida** — *Herramientas → Mensaje de bienvenida → Activar*")
+        st.code(f"¡Hola! 👋 Gracias por escribir a {_nom}.\n\n"
+                f"📅 Para agendar tu cita al instante, sin esperar respuesta: {_wa}\n\n"
+                f"🌐 O ve todos los horarios aquí: {_web}\n\n"
+                "Si tienes otra duda, escríbela y te contestamos en breve.", language=None, wrap_lines=True)
+        st.markdown("**2. Mensaje de ausencia** — *Herramientas → Mensaje de ausencia → Horario: "
+                    "\"Fuera del horario comercial\"* (no elijas \"Enviar siempre\")")
+        st.code(f"Gracias por escribirnos 🌙 En este momento estamos cerrados "
+                f"(atendemos de {negocio['hora_apertura']} a {negocio['hora_cierre']}), "
+                f"pero puedes agendar tu cita ahora mismo aquí: {_wa}\n\n"
+                "Mañana te contestamos cualquier otra duda.", language=None, wrap_lines=True)
+        st.markdown("**3. Respuesta rápida** — *Herramientas → Respuestas rápidas → +*  · Atajo: **/cita**")
+        st.code(f"Puedes agendar tu cita aquí en 1 minuto 😊 {_wa}\nO ver todos los horarios: {_web}",
+                language=None, wrap_lines=True)
+        st.caption("Tu recepcionista escribe /cita en cualquier chat y se pega el link. "
+                   "¿Usas WhatsApp normal y no Business? Puedes pasarte a Business sin perder tus chats.")
+
     st.subheader("Logo")
     mostrar_logo(negocio, ancho=160)
     logo_subido = st.file_uploader("Subir/cambiar logo (PNG o JPG)", type=["png", "jpg", "jpeg"])
