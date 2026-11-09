@@ -979,6 +979,9 @@ if pagina == "Agenda del día":
         if st.session_state.get("editando_cita"):
             return  # no interrumpir mientras editan una cita
         try:
+            # esta revision corre en otro hilo: hay que decirle otra vez que base usar
+            if turso_url and turso_token:
+                db.usar_turso(turso_url, turso_token)
             firma = db.firma_citas(fecha_iso)
         except Exception:
             return
