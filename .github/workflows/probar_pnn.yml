@@ -2,13 +2,13 @@ name: Generar voz de narracion
 on:
   workflow_dispatch:
     inputs:
-      texto:
-        description: "Texto a narrar"
+      lineas:
+        description: "Una linea por audio: nombre|texto"
         required: true
       voz:
         default: "es-MX-DaliaNeural"
-      nombre:
-        default: "muestra"
+      velocidad:
+        default: "+0%"
 permissions:
   contents: write
 jobs:
@@ -17,12 +17,15 @@ jobs:
     steps:
       - run: pip install -q edge-tts
       - env:
-          TEXTO: ${{ inputs.texto }}
+          LINEAS: ${{ inputs.lineas }}
           VOZ: ${{ inputs.voz }}
-          NOMBRE: ${{ inputs.nombre }}
+          VEL: ${{ inputs.velocidad }}
         run: |
           mkdir salida
-          edge-tts --voice "$VOZ" --rate=+5% --text "$TEXTO" --write-media "salida/$NOMBRE.mp3"
+          printf '%s\n' "$LINEAS" | while IFS='|' read -r nombre texto; do
+            [ -z "$nombre" ] && continue
+            edge-tts --voice "$VOZ" --rate="$VEL" --text "$texto" --write-media "salida/$nombre.mp3"
+          done
           ls -la salida
           cd salida && git init -q && git checkout -q -b voces
           git config user.name bot && git config user.email bot@users.noreply.github.com
