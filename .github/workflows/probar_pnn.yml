@@ -1,20 +1,29 @@
-# Revisa que los dominios de correo existan y puedan recibir correo (registro MX).
-name: Verificar dominios de correo
+name: Generar voz de narracion
 on:
   workflow_dispatch:
     inputs:
-      dominios:
-        description: "Dominios separados por espacio"
+      texto:
+        description: "Texto a narrar"
         required: true
+      voz:
+        default: "es-MX-DaliaNeural"
+      nombre:
+        default: "muestra"
+permissions:
+  contents: write
 jobs:
-  mx:
+  voz:
     runs-on: ubuntu-latest
     steps:
+      - run: pip install -q edge-tts
       - env:
-          DOMINIOS: ${{ inputs.dominios }}
+          TEXTO: ${{ inputs.texto }}
+          VOZ: ${{ inputs.voz }}
+          NOMBRE: ${{ inputs.nombre }}
         run: |
-          for d in $DOMINIOS; do
-            mx=$(dig +short +time=3 +tries=2 MX "$d" | head -1)
-            if [ -z "$mx" ]; then a=$(dig +short +time=3 +tries=2 A "$d" | head -1); [ -n "$a" ] && mx="A:$a"; fi
-            echo "RES|$d|${mx:-NINGUNO}"
-          done
+          mkdir salida
+          edge-tts --voice "$VOZ" --rate=+5% --text "$TEXTO" --write-media "salida/$NOMBRE.mp3"
+          ls -la salida
+          cd salida && git init -q && git checkout -q -b voces
+          git config user.name bot && git config user.email bot@users.noreply.github.com
+          git add . && git commit -q -m voz && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" voces
