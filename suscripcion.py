@@ -24,8 +24,8 @@ DIAS_PRUEBA = 14
 # Niveles de suscripcion: clave -> (nombre, precio MXN/mes, maximo de pacientes al mes)
 # "Pacientes al mes" = pacientes distintos con al menos una cita (no cancelada) en el mes.
 NIVELES = {
-    "basico": ("Básico", 499, 50),
-    "plus": ("Plus", 599, 100),
+    "basico": ("Básico", 399, 70),
+    "plus": ("Plus", 499, 100),
     "pro": ("Pro", 699, 200),
 }
 NIVEL_PREDETERMINADO = "basico"
